@@ -1,9 +1,9 @@
 // Where the download buttons point. Leave empty to serve the files from ./downloads beside this
 // page. Set a full URL (ending in /) when the files live elsewhere, such as a GitHub release.
-const DOWNLOAD_BASE = 'https://github.com/coolfamesguy-svg/ClipClip/releases/latest/download/';
+const DOWNLOAD_BASE = 'https://github.com/devuaka/ClipClip/releases/latest/download/';
 
 // Where the footer's source code link points.
-const SOURCE_URL = 'https://github.com/coolfamesguy-svg/ClipClip';
+const SOURCE_URL = 'https://github.com/devuaka/ClipClip';
 
 const DOWNLOADS = { setup: 'ClipClip-win-Setup.exe', portable: 'ClipClip-win-Portable.zip' };
 
