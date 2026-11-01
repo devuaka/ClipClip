@@ -1,0 +1,209 @@
+<UserControl x:Class="ClipClip.Views.HomeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:ClipClip.Controls">
+    <UserControl.Resources>
+        <Style x:Key="ClipButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <ScaleTransform />
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Ellipse x:Name="Disc" Fill="{StaticResource Ember}">
+                                <Ellipse.Effect>
+                                    <DropShadowEffect x:Name="Glow" BlurRadius="70" ShadowDepth="0" Color="#FF3D5A" Opacity="0.55" />
+                                </Ellipse.Effect>
+                            </Ellipse>
+                            <Ellipse x:Name="Shine" Margin="1" Opacity="0.16">
+                                <Ellipse.Fill>
+                                    <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,0.7">
+                                        <GradientStop Color="White" Offset="0" />
+                                        <GradientStop Color="Transparent" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Ellipse.Fill>
+                            </Ellipse>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Shine" Property="Opacity" Value="0.3" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Shine" Property="Opacity" Value="0.05" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Disc" Property="Fill" Value="{StaticResource Bg3}" />
+                                <Setter TargetName="Disc" Property="Effect" Value="{x:Null}" />
+                                <Setter TargetName="Shine" Property="Opacity" Value="0.03" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PulseRing" TargetType="Ellipse">
+            <Setter Property="Stroke" Value="{StaticResource Live}" />
+            <Setter Property="StrokeThickness" Value="1.5" />
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <ScaleTransform ScaleX="0.74" ScaleY="0.74" />
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <DataTemplate x:Key="RecentClip">
+            <Button Margin="0,0,12,0" Width="184" Padding="0" Background="Transparent"
+                    Command="{Binding DataContext.OpenClipCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"
+                    HorizontalContentAlignment="Stretch" ToolTip="{Binding Title}" AutomationProperties.Name="{Binding Title}">
+                <Grid>
+                    <Border CornerRadius="10" Height="104" Background="{StaticResource Bg2}" ClipToBounds="True">
+                        <Border.OpacityMask>
+                            <VisualBrush>
+                                <VisualBrush.Visual>
+                                    <Border Width="184" Height="104" Background="Black" CornerRadius="10" />
+                                </VisualBrush.Visual>
+                            </VisualBrush>
+                        </Border.OpacityMask>
+                        <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
+                    </Border>
+                    <Border VerticalAlignment="Bottom" HorizontalAlignment="Right" Margin="7" Background="#C0000000" CornerRadius="5" Padding="6,2">
+                        <TextBlock Text="{Binding Duration}" FontSize="11" Foreground="White" FontFamily="{StaticResource Display}" />
+                    </Border>
+                    <Border VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="7" Background="#C0000000" CornerRadius="5" Padding="6,2">
+                        <TextBlock Text="{Binding Game}" FontSize="11" Foreground="White" MaxWidth="110" TextTrimming="CharacterEllipsis" />
+                    </Border>
+                </Grid>
+            </Button>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header: state on the left, mode on the right -->
+        <Grid>
+            <StackPanel>
+                <TextBlock Style="{StaticResource H1}" Text="{Binding StatusTitle}" />
+                <TextBlock Style="{StaticResource Dim}" FontSize="14" Text="{Binding StatusDetail}" Margin="0,4,0,0" />
+            </StackPanel>
+
+            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top">
+                <Border Background="{StaticResource Bg1}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="11" Padding="3">
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton Style="{StaticResource Segment}" GroupName="Mode" Content="Games only" IsChecked="{Binding GamesOnly}" />
+                        <RadioButton Style="{StaticResource Segment}" GroupName="Mode" Content="Games and desktop" IsChecked="{Binding WithDesktop}" />
+                    </StackPanel>
+                </Border>
+                <TextBlock Style="{StaticResource Faint}" HorizontalAlignment="Right" Margin="0,7,2,0"
+                           Text="Records only while a game is running" Visibility="{Binding GamesOnly, Converter={StaticResource BoolVisible}}" />
+                <TextBlock Style="{StaticResource Faint}" HorizontalAlignment="Right" Margin="0,7,2,0"
+                           Text="Records your screen all the time" Visibility="{Binding WithDesktop, Converter={StaticResource BoolVisible}}" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Stage -->
+        <Grid Grid.Row="1" Margin="0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="210" MaxWidth="280" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" MinWidth="210" MaxWidth="280" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel VerticalAlignment="Center">
+                <c:StatTile Label="CLIP LENGTH" Value="{Binding ClipLength}" Detail="{Binding BufferText}" />
+                <c:StatTile Label="SHORTCUT" Value="{Binding Shortcut}" Detail="{Binding ShortcutDetail}" />
+                <c:StatTile Label="GAME" Value="{Binding GameText}" Detail="Detected automatically" />
+            </StackPanel>
+
+            <Grid Grid.Column="1" Width="330" Height="330" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Grid x:Name="Pulses" Visibility="{Binding IsLive, Converter={StaticResource BoolVisible}}">
+                    <Ellipse x:Name="PulseA" Style="{StaticResource PulseRing}" />
+                    <Ellipse x:Name="PulseB" Style="{StaticResource PulseRing}" />
+                    <Grid.Triggers>
+                        <EventTrigger RoutedEvent="Loaded">
+                            <BeginStoryboard>
+                                <Storyboard RepeatBehavior="Forever">
+                                    <DoubleAnimation Storyboard.TargetName="PulseA" Storyboard.TargetProperty="RenderTransform.ScaleX" From="0.74" To="1" Duration="0:0:3" />
+                                    <DoubleAnimation Storyboard.TargetName="PulseA" Storyboard.TargetProperty="RenderTransform.ScaleY" From="0.74" To="1" Duration="0:0:3" />
+                                    <DoubleAnimation Storyboard.TargetName="PulseA" Storyboard.TargetProperty="Opacity" From="0.55" To="0" Duration="0:0:3" />
+                                    <DoubleAnimation Storyboard.TargetName="PulseB" Storyboard.TargetProperty="RenderTransform.ScaleX" From="0.74" To="1" Duration="0:0:3" BeginTime="0:0:1.5" />
+                                    <DoubleAnimation Storyboard.TargetName="PulseB" Storyboard.TargetProperty="RenderTransform.ScaleY" From="0.74" To="1" Duration="0:0:3" BeginTime="0:0:1.5" />
+                                    <DoubleAnimation Storyboard.TargetName="PulseB" Storyboard.TargetProperty="Opacity" From="0.55" To="0" Duration="0:0:3" BeginTime="0:0:1.5" />
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                    </Grid.Triggers>
+                </Grid>
+
+                <Ellipse Width="262" Height="262" Stroke="{StaticResource Bg3}" StrokeThickness="6" />
+                <c:ArcRing Width="262" Height="262" Stroke="{StaticResource Ember}" StrokeThickness="6" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                           Progress="{Binding BufferProgress}" />
+
+                <Button x:Name="ClipBigButton" Style="{StaticResource ClipButton}" Width="214" Height="214"
+                        Command="{Binding ClipCommand}" IsEnabled="{Binding CanClip}" AutomationProperties.Name="Clip">
+                    <StackPanel>
+                        <TextBlock Text="CLIP" FontFamily="{StaticResource Display}" FontSize="44" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" />
+                        <TextBlock FontSize="13" Foreground="#E6FFFFFF" HorizontalAlignment="Center">
+                            <Run Text="last" /> <Run Text="{Binding ClipLength, Mode=OneWay}" />
+                        </TextBlock>
+                    </StackPanel>
+                </Button>
+            </Grid>
+
+            <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                <c:StatTile Label="MICROPHONE" Value="{Binding MicText}" Detail="{Binding MicDetail}" />
+                <c:StatTile Label="VOICE" Value="{Binding VoiceText}" Detail="{Binding VoiceDetail}" />
+                <c:StatTile Label="ENCODER" Value="{Binding EncoderText}" Detail="{Binding EncoderDetail}" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Recent clips -->
+        <Grid Grid.Row="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock Style="{StaticResource H2}" Text="Recent clips" VerticalAlignment="Center" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Style="{StaticResource GhostButton}" Command="{Binding TogglePauseCommand}" Padding="10,6" AutomationProperties.Name="Pause or resume recording">
+                    <Grid>
+                        <TextBlock Text="Pause recording" Visibility="{Binding IsPaused, Converter={StaticResource BoolHidden}}" />
+                        <TextBlock Text="Resume recording" Foreground="{StaticResource Warn}" Visibility="{Binding IsPaused, Converter={StaticResource BoolVisible}}" />
+                    </Grid>
+                </Button>
+                <Button Style="{StaticResource GhostButton}" Content="View all" Command="{Binding ViewAllCommand}" Padding="10,6" />
+            </StackPanel>
+
+            <Grid Grid.Row="1" Margin="0,10,0,0" Height="104">
+                <ItemsControl ItemsSource="{Binding Recent}" ItemTemplate="{StaticResource RecentClip}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+                <Border Style="{StaticResource Card}" Visibility="{Binding HasRecent, Converter={StaticResource BoolHidden}}">
+                    <TextBlock Style="{StaticResource Dim}" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center">
+                        <Run Text="Your clips show up here. Press" /> <Run Text="{Binding Shortcut, Mode=OneWay}" Foreground="{StaticResource Text}" FontWeight="SemiBold" />
+                        <Run Text="to save your first one." />
+                    </TextBlock>
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

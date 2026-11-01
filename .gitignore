@@ -1,0 +1,8 @@
+bin/
+obj/
+artifacts/
+third_party/ffmpeg/*.dll
+third_party/vosk-model/
+.vs/
+*.user
+docs/downloads/

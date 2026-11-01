@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ClipClip</title>
+  <meta name="description" content="Instant replay for Windows. ClipClip keeps your last 30 seconds in memory and saves them when you press F8 or say &quot;clip that&quot;. Free, no account, nothing uploaded.">
+  <meta name="theme-color" content="#0b0c10">
+  <meta property="og:title" content="ClipClip">
+  <meta property="og:description" content="Press F8. Keep the last 30 seconds. Instant replay for Windows.">
+  <meta property="og:image" content="https://coolfamesguy-svg.github.io/ClipClip/img/home-crop.png">
+  <link rel="icon" href="favicon.ico">
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav">
+    <div class="wrap nav-row">
+      <a class="brand" href="#top" aria-label="ClipClip home">
+        <svg class="logo" viewBox="0 0 44 44" aria-hidden="true">
+          <rect width="44" height="44" rx="11" fill="url(#ember)"/>
+          <path d="M30.49 32.11A13.2 13.2 0 1 1 30.49 11.89M26.11 26.9A6.4 6.4 0 1 1 26.11 17.1" fill="none" stroke="#fff" stroke-width="4.4" stroke-linecap="round"/>
+          <defs>
+            <linearGradient id="ember" x1="0" y1="0" x2="1" y2="1">
+              <stop stop-color="#ff3d5a"/>
+              <stop offset="1" stop-color="#ff8a3d"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <span>ClipClip</span>
+      </a>
+      <nav class="nav-links" aria-label="Page sections">
+        <a href="#how">How it works</a>
+        <a href="#library">Features</a>
+        <a href="#numbers">Performance</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <a class="btn btn-small" data-download="setup" href="https://github.com/coolfamesguy-svg/ClipClip/releases/latest/download/ClipClip-win-Setup.exe" download>Download</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow">Instant replay for Windows</p>
+          <h1>Press <kbd class="key">F8</kbd> Keep the last 30&nbsp;seconds.</h1>
+          <p class="lede">ClipClip holds your recent gameplay in memory. When something great happens, press a key or just say "clip that". You get a normal MP4 and recording never stops.</p>
+          <div class="cta">
+            <a class="btn" data-download="setup" href="https://github.com/coolfamesguy-svg/ClipClip/releases/latest/download/ClipClip-win-Setup.exe" download>
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.5v9M6.5 9l3.5 3.5L13.500 9M4 15.500h12"/></svg>
+              Download for Windows
+            </a>
+            <p class="cta-meta">Version 1.0.0 &middot; 201 MB &middot; Free, no account</p>
+          </div>
+        </div>
+        <figure class="hero-shot">
+          <img src="img/home-crop.png" width="762" height="640" alt="The ClipClip home screen with a large Clip button, its ring filling as footage is buffered, voice listening and NVENC encoding.">
+        </figure>
+      </div>
+    </section>
+
+    <section class="rail-band" id="how" aria-labelledby="rail-title">
+      <div class="wrap">
+        <div class="rail-head">
+          <div>
+            <h2 id="rail-title">Always the last 30 seconds</h2>
+            <p>The moment already happened by the time you react. ClipClip is already holding it. Try it here.</p>
+          </div>
+          <button class="key-button" id="rail-clip" type="button"><kbd class="key key-small">F8</kbd> Clip it</button>
+        </div>
+        <div class="rail" id="rail">
+          <canvas id="rail-canvas" aria-hidden="true"></canvas>
+          <div class="rail-window" id="rail-window"></div>
+          <div class="rail-scale" aria-hidden="true">
+            <span>-30s</span><span>-20s</span><span>-10s</span><span class="now">Now</span>
+          </div>
+        </div>
+        <div class="saved" id="saved" aria-live="polite">
+          <p class="saved-empty" id="saved-empty">Press F8 or the button. This demo runs in your browser and records nothing.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="triggers wrap" aria-labelledby="triggers-title">
+      <h2 id="triggers-title">Three ways to catch it</h2>
+      <div class="trigger-list">
+        <article>
+          <h3><kbd class="key key-small">F8</kbd> Hit the key</h3>
+          <p>Works while your game has focus. Pick any key combination you like, and ClipClip warns you if another app already owns it.</p>
+        </article>
+        <article>
+          <h3><span class="say">"Clip that"</span> Say it</h3>
+          <p>Hands busy? Speech recognition runs entirely on your PC, listens for your phrase only, and you can change the phrase.</p>
+        </article>
+        <article>
+          <h3><span class="dot"></span> Click it</h3>
+          <p>A big Clip button in the app and a Clip Now item in the system tray. A repeat press never makes a duplicate clip.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="feature wrap" id="library">
+      <div class="feature-copy">
+        <h2>Your clips, ready to share</h2>
+        <p>Every clip lands in a library with thumbnails, the game it came from, the date and its length. Search by name or game, watch it right there, rename it, or copy it straight into Discord.</p>
+        <ul class="ticks">
+          <li>Plain MP4 files in a folder you choose</li>
+          <li>Export, copy or open in any player</li>
+          <li>Deleted clips go to the Recycle Bin</li>
+        </ul>
+      </div>
+      <div class="shots">
+        <img src="img/clips-crop.png" width="1200" height="345" alt="The My Clips library showing three clips from different games with thumbnails, durations and export buttons." loading="lazy">
+        <img src="img/player.png" width="1200" height="800" alt="A saved dirt bike clip playing inside ClipClip with a seek bar, volume and export controls." loading="lazy">
+      </div>
+    </section>
+
+    <section class="split wrap">
+      <div>
+        <h2>Starts when the game does</h2>
+        <p>ClipClip spots games from your Steam, Epic, GOG and Xbox libraries, and recognizes Unity and Unreal games on its own. When the game closes, recording stops.</p>
+        <p>Missing one? Point ClipClip at the .exe, give it a name, and it is recognized from then on.</p>
+      </div>
+      <div>
+        <h2>Or record everything</h2>
+        <p>Turn on Games and desktop to clip your browser, your apps or anything else on screen. The two modes sit side by side on the home screen, so you always know which one you are in.</p>
+        <p>The tray icon stays colored while recording. Pause any time.</p>
+      </div>
+      <div>
+        <h2>Your voice, in sync</h2>
+        <p>Mix your microphone into clips with its own volume and mute, separate from game audio. If the mic gets unplugged, clips keep saving and it reconnects when it comes back.</p>
+      </div>
+    </section>
+
+    <section class="numbers" id="numbers" aria-labelledby="numbers-title">
+      <div class="wrap">
+        <h2 id="numbers-title">Light enough to forget about</h2>
+        <p class="numbers-intro">Hardware encoding on your graphics card does the heavy work. ClipClip supports NVIDIA NVENC, AMD AMF and Intel Quick Sync, with a software fallback.</p>
+        <dl class="stats">
+          <div><dt>CPU while recording</dt><dd>0.22<small>%</small></dd></div>
+          <div><dt>Memory in the tray</dt><dd>281<small>MB</small></dd></div>
+          <div><dt>Video to game audio</dt><dd>1&ndash;13<small>ms</small></dd></div>
+          <div><dt>Frame rate cost, GPU maxed out</dt><dd>5.7<small>%</small></dd></div>
+        </dl>
+        <p class="footnote">Measured on one PC: 32 thread CPU, RTX 5070, recording 1080p at 60 fps with NVENC. CPU is a share of all cores. The frame rate test is a worst case, with an uncapped renderer holding the GPU at full load. Your numbers will vary.</p>
+      </div>
+    </section>
+
+    <section class="privacy wrap" aria-labelledby="privacy-title">
+      <h2 id="privacy-title">It stays on your PC</h2>
+      <ul>
+        <li><strong>No account.</strong> Install it and go.</li>
+        <li><strong>No uploads.</strong> Clips are files on your drive and nothing else.</li>
+        <li><strong>No subscription.</strong> Every feature is included.</li>
+        <li><strong>Voice stays local.</strong> Microphone audio is decoded on your PC and thrown away.</li>
+      </ul>
+    </section>
+
+    <section class="faq wrap" id="faq" aria-labelledby="faq-title">
+      <h2 id="faq-title">Questions</h2>
+      <details>
+        <summary>Why does Windows warn me when I run the installer?</summary>
+        <p>The installer isn't code signed yet, so SmartScreen doesn't recognize it. Choose More info, then Run anyway.</p>
+      </details>
+      <details>
+        <summary>Could it get me banned from a game?</summary>
+        <p>ClipClip doesn't inject anything into games or read their memory. It records through the capture system built into Windows. That said, each anti-cheat sets its own rules, so nobody can promise how every game will react.</p>
+      </details>
+      <details>
+        <summary>What do I need to run it?</summary>
+        <p>64-bit Windows 11, or Windows 10 version 2004 or newer. It uses about 500 MB of disk, plus whatever your clips take up. ClipClip was developed and tested on Windows 11. A modern graphics card keeps recording light, and it also works without one by encoding on the CPU.</p>
+      </details>
+      <details>
+        <summary>Does it work with exclusive fullscreen games?</summary>
+        <p>Borderless and regular fullscreen work. Very old games running in true exclusive fullscreen may record black. Switching those games to borderless fixes it.</p>
+      </details>
+      <details>
+        <summary>Which languages does voice clipping understand?</summary>
+        <p>English for now. You can change the trigger phrase, and there is a sensitivity slider and a microphone test in Settings.</p>
+      </details>
+      <details>
+        <summary>Can I clip longer than 30 seconds?</summary>
+        <p>Yes. Choose from 15 seconds up to 3 minutes, or set any length up to 30 minutes. Longer clips use more memory while recording.</p>
+      </details>
+      <details>
+        <summary>How do I uninstall it?</summary>
+        <p>Use Installed apps in Windows Settings. Your clips stay where they are.</p>
+      </details>
+    </section>
+
+    <section class="closer">
+      <div class="wrap">
+        <h2>Never miss the good one again</h2>
+        <a class="btn" data-download="setup" href="https://github.com/coolfamesguy-svg/ClipClip/releases/latest/download/ClipClip-win-Setup.exe" download>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.5v9M6.5 9l3.5 3.5L13.500 9M4 15.500h12"/></svg>
+          Download for Windows
+        </a>
+        <p class="cta-meta">Version 1.0.0 &middot; 201 MB &middot; Prefer no installer? <a data-download="portable" href="https://github.com/coolfamesguy-svg/ClipClip/releases/latest/download/ClipClip-win-Portable.zip" download>Get the portable zip</a> (194 MB)</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap foot">
+    <p>ClipClip is free software under the GNU GPL. <a id="source-link" href="https://github.com/coolfamesguy-svg/ClipClip">Source code</a>. It includes FFmpeg and x264 under the GNU GPL, and Vosk under the Apache License 2.0.</p>
+  </footer>
+
+  <script src="site.js"></script>
+</body>
+</html>

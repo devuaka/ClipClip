@@ -1,0 +1,187 @@
+<UserControl x:Class="ClipClip.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:ClipClip.Controls">
+    <UserControl.Resources>
+        <Style x:Key="Section" TargetType="Border" BasedOn="{StaticResource Card}">
+            <Setter Property="Padding" Value="20,16,20,10" />
+            <Setter Property="Margin" Value="0,0,8,14" />
+        </Style>
+        <Style x:Key="SectionTitle" TargetType="TextBlock" BasedOn="{StaticResource H2}">
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+        <Style x:Key="ErrorText" TargetType="TextBlock" BasedOn="{StaticResource Dim}">
+            <Setter Property="Foreground" Value="{StaticResource Warn}" />
+            <Setter Property="Margin" Value="0,2,0,8" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <TextBlock Style="{StaticResource H1}" Text="Settings" Margin="0,0,0,16" />
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" PanningMode="VerticalOnly">
+            <StackPanel MaxWidth="1040" HorizontalAlignment="Left">
+                <Border Style="{StaticResource Section}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Clipping" />
+                        <c:SettingRow Title="Record outside games" Description="On: your desktop and apps are always being recorded. Off: only while a game runs.">
+                            <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding RecordOutsideGames}" HorizontalAlignment="Right" AutomationProperties.Name="Record outside games" />
+                        </c:SettingRow>
+                        <c:SettingRow Title="Clip length" Description="How far back a clip reaches">
+                            <ComboBox ItemsSource="{Binding DurationChoices}" SelectedItem="{Binding Duration}" DisplayMemberPath="Label" AutomationProperties.Name="Clip length" />
+                        </c:SettingRow>
+                        <c:SettingRow Title="Custom length" Description="Any length from 5 to 1800 seconds">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Text="{Binding CustomSeconds, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Custom length seconds" />
+                                <Button Grid.Column="1" Content="Set" Margin="8,0,0,0" Command="{Binding ApplyCustomSecondsCommand}" />
+                            </Grid>
+                        </c:SettingRow>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Section}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Video" />
+                        <c:SettingRow Title="Quality" Description="Higher quality makes bigger clips and uses more memory">
+                            <ComboBox ItemsSource="{Binding QualityChoices}" SelectedItem="{Binding Quality}" DisplayMemberPath="Label" AutomationProperties.Name="Quality" />
+                        </c:SettingRow>
+                        <c:SettingRow Title="Resolution">
+                            <ComboBox ItemsSource="{Binding ResolutionChoices}" SelectedItem="{Binding Resolution}" DisplayMemberPath="Label" AutomationProperties.Name="Resolution" />
+                        </c:SettingRow>
+                        <c:SettingRow Title="Frame rate">
+                            <ComboBox ItemsSource="{Binding FpsChoices}" SelectedItem="{Binding Fps}" DisplayMemberPath="Label" AutomationProperties.Name="Frame rate" />
+                        </c:SettingRow>
+                        <c:SettingRow Title="Encoder" Description="{Binding EncoderStatus}">
+                            <ComboBox ItemsSource="{Binding EncoderChoices}" SelectedItem="{Binding Encoder}" DisplayMemberPath="Label" AutomationProperties.Name="Encoder" />
+                        </c:SettingRow>
+                        <c:SettingRow Title="Monitor" Description="Which screen desktop recording uses">
+                            <ComboBox ItemsSource="{Binding MonitorChoices}" SelectedItem="{Binding Monitor}" DisplayMemberPath="Label" AutomationProperties.Name="Monitor" />
+                        </c:SettingRow>
+                        <c:SettingRow Title="Show mouse cursor">
+                            <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding CaptureCursor}" HorizontalAlignment="Right" AutomationProperties.Name="Show mouse cursor" />
+                        </c:SettingRow>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Section}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Audio" />
+                        <c:SettingRow Title="System and game audio">
+                            <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding SystemAudio}" HorizontalAlignment="Right" AutomationProperties.Name="System and game audio" />
+                        </c:SettingRow>
+                        <c:SettingRow Title="System volume in clips">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="46" />
+                                </Grid.ColumnDefinitions>
+                                <Slider Minimum="0" Maximum="1.5" Value="{Binding SystemVolume}" IsEnabled="{Binding SystemAudio}" VerticalAlignment="Center" AutomationProperties.Name="System volume" />
+                                <TextBlock Grid.Column="1" Style="{StaticResource Dim}" Text="{Binding SystemVolume, Converter={StaticResource Percent}}" TextAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                        </c:SettingRow>
+                        <c:SettingRow Title="Include my microphone" Description="Mixes your voice into saved clips. Turning this off clears buffered footage.">
+                            <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding IncludeMic}" HorizontalAlignment="Right" AutomationProperties.Name="Include my microphone" />
+                        </c:SettingRow>
+                        <c:SettingRow Title="Microphone" Description="Also used for voice clipping">
+                            <ComboBox ItemsSource="{Binding MicChoices}" SelectedItem="{Binding Mic}" DisplayMemberPath="Label" AutomationProperties.Name="Microphone" />
+                        </c:SettingRow>
+                        <c:SettingRow Title="Microphone volume in clips">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="46" />
+                                </Grid.ColumnDefinitions>
+                                <Slider Minimum="0" Maximum="2" Value="{Binding MicVolume}" IsEnabled="{Binding IncludeMic}" VerticalAlignment="Center" AutomationProperties.Name="Microphone volume" />
+                                <TextBlock Grid.Column="1" Style="{StaticResource Dim}" Text="{Binding MicVolume, Converter={StaticResource Percent}}" TextAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                        </c:SettingRow>
+                        <c:SettingRow Title="Mute microphone" Description="Silences the mic in clips without turning it off">
+                            <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding MicMuted}" HorizontalAlignment="Right" AutomationProperties.Name="Mute microphone" />
+                        </c:SettingRow>
+                        <c:SettingRow Title="Microphone test" Description="Records 4 seconds, plays it back and checks your trigger phrase">
+                            <StackPanel>
+                                <Button Content="{Binding TestButtonText}" Command="{Binding TestMicCommand}" IsEnabled="{Binding Testing, Converter={StaticResource Not}}" />
+                                <ProgressBar Height="5" Margin="0,8,0,0" Maximum="1" Value="{Binding MicLevel, Mode=OneWay}" Foreground="{StaticResource Ready}" Background="{StaticResource Bg3}" BorderThickness="0" />
+                            </StackPanel>
+                        </c:SettingRow>
+                        <TextBlock Style="{StaticResource Dim}" Text="{Binding TestResult}" Margin="0,0,0,8"
+                                   Visibility="{Binding TestResult, Converter={StaticResource HasValue}}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Section}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Voice clipping" />
+                        <c:SettingRow Title="Clip by voice" Description="Runs entirely on this PC. Your microphone audio never leaves it.">
+                            <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding VoiceEnabled}" HorizontalAlignment="Right" AutomationProperties.Name="Clip by voice" />
+                        </c:SettingRow>
+                        <c:SettingRow Title="Trigger phrase" Description="One to five English words">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Text="{Binding VoicePhrase, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Trigger phrase" />
+                                <Button Grid.Column="1" Content="Set" Margin="8,0,0,0" Command="{Binding ApplyPhraseCommand}" />
+                            </Grid>
+                        </c:SettingRow>
+                        <TextBlock Style="{StaticResource ErrorText}" Text="{Binding PhraseError}" Visibility="{Binding PhraseError, Converter={StaticResource HasValue}}" />
+                        <c:SettingRow Title="Sensitivity" Description="Raise it if ClipClip misses you. Lower it if it fires by mistake.">
+                            <Slider Minimum="0" Maximum="1" Value="{Binding VoiceSensitivity}" VerticalAlignment="Center" AutomationProperties.Name="Voice sensitivity" />
+                        </c:SettingRow>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Section}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Shortcuts" />
+                        <c:SettingRow Title="Save a clip" Description="Click, then press your keys. Esc cancels.">
+                            <c:HotkeyBox Hotkey="{Binding ClipHotkey, Mode=TwoWay}" AutomationProperties.Name="Save a clip shortcut" />
+                        </c:SettingRow>
+                        <c:SettingRow Title="Open ClipClip">
+                            <c:HotkeyBox Hotkey="{Binding OpenHotkey, Mode=TwoWay}" AutomationProperties.Name="Open ClipClip shortcut" />
+                        </c:SettingRow>
+                        <TextBlock Style="{StaticResource ErrorText}" Text="{Binding HotkeyError}" Visibility="{Binding HotkeyError, Converter={StaticResource HasValue}}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Section}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Storage" />
+                        <c:SettingRow Title="Clip folder" Description="{Binding ClipDirectory}">
+                            <Button Content="Change folder" Command="{Binding BrowseFolderCommand}" AutomationProperties.Name="Change clip folder" />
+                        </c:SettingRow>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Section}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="App" />
+                        <c:SettingRow Title="Start with Windows" Description="Starts quietly in the system tray">
+                            <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding StartWithWindows}" HorizontalAlignment="Right" AutomationProperties.Name="Start with Windows" />
+                        </c:SettingRow>
+                        <c:SettingRow Title="Keep running in the tray" Description="Closing the window keeps recording going">
+                            <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding MinimizeToTray}" HorizontalAlignment="Right" AutomationProperties.Name="Keep running in the tray" />
+                        </c:SettingRow>
+                        <c:SettingRow Title="Notifications" Description="Shows a small popup when a clip saves. Problems always show.">
+                            <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding Notifications}" HorizontalAlignment="Right" AutomationProperties.Name="Notifications" />
+                        </c:SettingRow>
+                        <c:SettingRow Title="Clip sound">
+                            <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding ClipSound}" HorizontalAlignment="Right" AutomationProperties.Name="Clip sound" />
+                        </c:SettingRow>
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Style="{StaticResource Faint}" Margin="4,0,0,12" Text="ClipClip records on this PC only. No account, no uploads, nothing sent anywhere." />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

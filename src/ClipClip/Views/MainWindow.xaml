@@ -1,0 +1,113 @@
+<Window x:Class="ClipClip.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:v="clr-namespace:ClipClip.Views"
+        Title="ClipClip" Width="1200" Height="800" MinWidth="1060" MinHeight="720"
+        Background="{StaticResource Bg0}" Foreground="{StaticResource Text}"
+        FontFamily="{StaticResource Body}" WindowStartupLocation="CenterScreen"
+        Icon="pack://application:,,,/Assets/ClipClip.ico" UseLayoutRounding="True">
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="44" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
+
+    <Grid x:Name="Root" Background="{StaticResource WindowWash}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="96" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Navigation rail -->
+        <Grid Background="#80101218">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Border Width="44" Height="44" CornerRadius="11" Background="{StaticResource Ember}" Margin="0,18,0,20">
+                <Path Data="M30.49,32.11 A13.2,13.2 0 1 1 30.49,11.89 M26.11,26.9 A6.4,6.4 0 1 1 26.11,17.1"
+                      Stroke="White" StrokeThickness="4.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+            </Border>
+
+            <StackPanel Grid.Row="1">
+                <RadioButton Style="{StaticResource NavItem}" GroupName="Nav" IsChecked="{Binding IsHome}" AutomationProperties.Name="Home">
+                    <StackPanel>
+                        <Path Style="{StaticResource Icon}" Data="{StaticResource IconHome}" />
+                        <TextBlock Text="Home" FontSize="11" Margin="0,4,0,0" HorizontalAlignment="Center" />
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource NavItem}" GroupName="Nav" IsChecked="{Binding IsClips}" AutomationProperties.Name="My Clips">
+                    <StackPanel>
+                        <Path Style="{StaticResource Icon}" Data="{StaticResource IconClips}" />
+                        <TextBlock Text="My Clips" FontSize="11" Margin="0,4,0,0" HorizontalAlignment="Center" />
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource NavItem}" GroupName="Nav" IsChecked="{Binding IsGames}" AutomationProperties.Name="Games">
+                    <StackPanel>
+                        <Path Style="{StaticResource Icon}" Data="{StaticResource IconGames}" />
+                        <TextBlock Text="Games" FontSize="11" Margin="0,4,0,0" HorizontalAlignment="Center" />
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource NavItem}" GroupName="Nav" IsChecked="{Binding IsSettings}" AutomationProperties.Name="Settings">
+                    <StackPanel>
+                        <Path Style="{StaticResource Icon}" Data="{StaticResource IconSettings}" />
+                        <TextBlock Text="Settings" FontSize="11" Margin="0,4,0,0" HorizontalAlignment="Center" />
+                    </StackPanel>
+                </RadioButton>
+            </StackPanel>
+
+            <!-- Always on screen: the recording indicator -->
+            <StackPanel Grid.Row="2" Margin="0,0,0,18" HorizontalAlignment="Center">
+                <Grid Width="14" Height="14" HorizontalAlignment="Center">
+                    <Ellipse Fill="{StaticResource Live}" Visibility="{Binding Home.IsLive, Converter={StaticResource BoolVisible}}">
+                        <Ellipse.Triggers>
+                            <EventTrigger RoutedEvent="Loaded">
+                                <BeginStoryboard>
+                                    <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0.35" Duration="0:0:0.9" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </Ellipse.Triggers>
+                    </Ellipse>
+                    <Ellipse Fill="{StaticResource TextFaint}" Visibility="{Binding Home.IsLive, Converter={StaticResource BoolHidden}}" />
+                </Grid>
+                <TextBlock FontFamily="{StaticResource Display}" FontSize="10" Foreground="{StaticResource TextDim}" Margin="0,6,0,0"
+                           HorizontalAlignment="Center" Text="REC" Visibility="{Binding Home.IsLive, Converter={StaticResource BoolVisible}}" />
+                <TextBlock FontFamily="{StaticResource Display}" FontSize="10" Foreground="{StaticResource TextFaint}" Margin="0,6,0,0"
+                           HorizontalAlignment="Center" Text="OFF" Visibility="{Binding Home.IsLive, Converter={StaticResource BoolHidden}}" />
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="44" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Title bar -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" WindowChrome.IsHitTestVisibleInChrome="True">
+                <Button Style="{StaticResource WindowButton}" Click="OnMinimize" ToolTip="Minimize" AutomationProperties.Name="Minimize">
+                    <Path Style="{StaticResource Icon}" Data="{StaticResource IconMin}" />
+                </Button>
+                <Button Style="{StaticResource WindowButton}" Click="OnClose" ToolTip="Close" AutomationProperties.Name="Close">
+                    <Path Style="{StaticResource Icon}" Data="{StaticResource IconClose}" />
+                </Button>
+            </StackPanel>
+            <TextBlock Text="Everything stays on this PC" Style="{StaticResource Faint}" VerticalAlignment="Center" Margin="4,0,0,0" />
+
+            <Grid x:Name="Pages" Grid.Row="1" Margin="4,0,28,20">
+                <v:HomeView DataContext="{Binding Home}" Visibility="{Binding DataContext.IsHome, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolVisible}}" />
+                <v:ClipsView DataContext="{Binding Clips}" Visibility="{Binding DataContext.IsClips, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolVisible}}" />
+                <v:GamesView DataContext="{Binding Games}" Visibility="{Binding DataContext.IsGames, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolVisible}}" />
+                <v:SettingsView DataContext="{Binding Settings}" Visibility="{Binding DataContext.IsSettings, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolVisible}}" />
+            </Grid>
+
+            <Border Grid.Row="1" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,76" Padding="16,10" CornerRadius="10"
+                    Background="{StaticResource Bg3}" BorderBrush="{StaticResource Line}" BorderThickness="1"
+                    Visibility="{Binding Notice, Converter={StaticResource HasValue}}">
+                <TextBlock Text="{Binding Notice}" Foreground="{StaticResource Text}" FontSize="13" />
+            </Border>
+        </Grid>
+    </Grid>
+</Window>
