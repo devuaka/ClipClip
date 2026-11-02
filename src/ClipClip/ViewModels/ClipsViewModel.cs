@@ -26,6 +26,12 @@ public sealed class ClipsViewModel : ObservableObject, IDisposable
     private string _renameText = "";
     private bool _isRenaming;
     private ClipInfo? _pendingPlay;
+    private bool _favoritesOnly;
+    private bool _isEditing;
+    private double _trimStart;
+    private double _trimEnd;
+    private bool _removeAudio;
+    private bool _savingTrim;
 
     public ClipsViewModel(ClipController controller, MainViewModel main)
     {
@@ -53,6 +59,9 @@ public sealed class ClipsViewModel : ObservableObject, IDisposable
         ConfirmRenameCommand = new RelayCommand(ConfirmRename);
         CancelRenameCommand = new RelayCommand(() => IsRenaming = false);
         OpenClipFolderCommand = new RelayCommand(() => Shell(_controller.Settings.ClipDirectory));
+        ToggleFavoriteCommand = new RelayCommand(parameter => ToggleFavorite(ItemFrom(parameter)));
+        ToggleEditCommand = new RelayCommand(ToggleEdit);
+        SaveTrimCommand = new RelayCommand(SaveTrim);
 
         _libraryChanged = () => Application.Current.Dispatcher.BeginInvoke(Reload);
         controller.Library.Changed += _libraryChanged;
@@ -73,6 +82,9 @@ public sealed class ClipsViewModel : ObservableObject, IDisposable
     public RelayCommand ConfirmRenameCommand { get; }
     public RelayCommand CancelRenameCommand { get; }
     public RelayCommand OpenClipFolderCommand { get; }
+    public RelayCommand ToggleFavoriteCommand { get; }
+    public RelayCommand ToggleEditCommand { get; }
+    public RelayCommand SaveTrimCommand { get; }
 
     /// <summary>The player must let go of a file before it can be renamed or deleted.</summary>
     public event Action? ReleaseMedia;
@@ -104,6 +116,86 @@ public sealed class ClipsViewModel : ObservableObject, IDisposable
         }
     }
 
+    public bool FavoritesOnly
+    {
+        get => _favoritesOnly;
+        set
+        {
+            if (Set(ref _favoritesOnly, value)) Reload();
+        }
+    }
+
+    public bool IsEditing { get => _isEditing; private set => Set(ref _isEditing, value); }
+    public bool RemoveAudio { get => _removeAudio; set => Set(ref _removeAudio, value); }
+    public double TrimStart => _trimStart;
+    public double TrimEnd => _trimEnd;
+    public double ClipLength => _playing?.Info.DurationSeconds ?? 0;
+    public string TrimSummary =>
+        $"Keeps {ClipItem.FormatTime(_trimStart)} to {ClipItem.FormatTime(_trimEnd)}, {ClipItem.FormatTime(_trimEnd - _trimStart)} long";
+
+    /// <summary>Raised when the kept range changes, so the view can redraw it.</summary>
+    public event Action? TrimChanged;
+
+    public void SetTrimStart(double seconds)
+    {
+        _trimStart = Math.Clamp(seconds, 0, Math.Max(0, _trimEnd - 1));
+        TrimUpdated();
+    }
+
+    public void SetTrimEnd(double seconds)
+    {
+        _trimEnd = Math.Clamp(seconds, Math.Min(_trimStart + 1, ClipLength), ClipLength);
+        TrimUpdated();
+    }
+
+    private void TrimUpdated()
+    {
+        Notify(nameof(TrimSummary));
+        TrimChanged?.Invoke();
+    }
+
+    private void ToggleEdit()
+    {
+        IsEditing = !_isEditing;
+        RemoveAudio = false;
+        _trimStart = 0;
+        _trimEnd = ClipLength;
+        TrimUpdated();
+    }
+
+    private async void SaveTrim()
+    {
+        ClipItem? item = _playing;
+        if (item == null || _savingTrim) return;
+        _savingTrim = true;
+        string source = item.Info.Path;
+        double start = _trimStart, end = _trimEnd;
+        bool removeAudio = _removeAudio;
+        try
+        {
+            string saved = await Task.Run(() => ClipEditor.Trim(source, start, end, removeAudio));
+            await Task.Run(_controller.Library.Refresh);
+            IsEditing = false;
+            _main.ShowNotice($"Saved as {Path.GetFileNameWithoutExtension(saved)}. The original is unchanged.");
+        }
+        catch (Exception ex)
+        {
+            _main.ShowNotice("Could not save the edit: " + ex.Message);
+        }
+        finally
+        {
+            _savingTrim = false;
+        }
+    }
+
+    private void ToggleFavorite(ClipItem? item)
+    {
+        if (item == null) return;
+        item.IsFavorite = !item.IsFavorite;
+        _controller.Library.SetFavorite(item.Info, item.IsFavorite);
+        if (_favoritesOnly) Reload();
+    }
+
     public bool IsPlayerOpen => _playing != null;
     public bool IsEmpty => Items.Count == 0;
     public bool LibraryHasClips => _controller.Library.Clips.Count > 0;
@@ -123,12 +215,14 @@ public sealed class ClipsViewModel : ObservableObject, IDisposable
             return;
         }
         IsRenaming = false;
+        IsEditing = false;
         Playing = item;
     }
 
     public void ClosePlayer()
     {
         IsRenaming = false;
+        IsEditing = false;
         ReleaseMedia?.Invoke();
         Playing = null;
     }
@@ -136,6 +230,7 @@ public sealed class ClipsViewModel : ObservableObject, IDisposable
     private void Reload()
     {
         IEnumerable<ClipInfo> clips = _controller.Library.Clips;
+        if (_favoritesOnly) clips = clips.Where(c => c.IsFavorite);
         string query = _search.Trim();
         if (query.Length > 0)
         {

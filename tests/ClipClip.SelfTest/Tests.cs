@@ -31,6 +31,7 @@ internal static class Tests
         "micloss" => MicLoss(args),
         "resize" => ResizeTest(),
         "recovery" => Recovery(),
+        "trim" => TrimTest(),
         "recordwindow" => RecordWindow(args[0], int.Parse(args[1]), args[2], args[3]),
         "ring" => RingTests.Run(),
         "gpuload" => GpuLoad.Render(int.Parse(args[0])),
@@ -495,6 +496,30 @@ internal static class Tests
         ClipResult result = engine.SaveClip(directory, game, ClipTrigger.Automation)!.GetAwaiter().GetResult();
         Console.WriteLine(result);
         return result.Success ? 0 : 1;
+    }
+
+    private static int TrimTest()
+    {
+        string directory = Path.Combine(Program.OutputDir, "trim");
+        Directory.CreateDirectory(directory);
+        string source;
+        using (RecordingEngine engine = NewEngine(7))
+        {
+            engine.Start();
+            Thread.Sleep(9000);
+            source = engine.SaveClip(directory, "Trim", ClipTrigger.Automation)!.GetAwaiter().GetResult().Path!;
+        }
+        string kept = ClipEditor.Trim(source, 2.2, 5.5, false);
+        string silent = ClipEditor.Trim(source, 1, 4, true);
+        ClipProbe a = ClipProbe.Read(kept, true);
+        ClipProbe b = ClipProbe.Read(silent, true);
+        Console.WriteLine($"with audio {a.DurationSeconds:F2}s audio={a.HasAudio} game={a.Game} decodable={a.HasDecodableVideo}");
+        Console.WriteLine($"no audio {b.DurationSeconds:F2}s audio={b.HasAudio} decodable={b.HasDecodableVideo}");
+        bool ok = a.HasAudio && !b.HasAudio && a.HasDecodableVideo && b.HasDecodableVideo &&
+                  a.DurationSeconds is > 3 and < 4.8 && b.DurationSeconds is > 2.5 and < 3.6 && a.Game == "Trim";
+        Directory.Delete(directory, true);
+        Console.WriteLine(ok ? "PASS" : "FAIL");
+        return ok ? 0 : 1;
     }
 
     /// <summary>A failed video session must restart itself, keep clipping, and fall back to

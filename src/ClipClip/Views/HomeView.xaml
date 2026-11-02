@@ -18,7 +18,7 @@
                         <Grid>
                             <Ellipse x:Name="Disc" Fill="{StaticResource Ember}">
                                 <Ellipse.Effect>
-                                    <DropShadowEffect x:Name="Glow" BlurRadius="70" ShadowDepth="0" Color="#FF3D5A" Opacity="0.55" />
+                                    <DropShadowEffect x:Name="Glow" BlurRadius="70" ShadowDepth="0" Color="#A855F7" Opacity="0.55" />
                                 </Ellipse.Effect>
                             </Ellipse>
                             <Ellipse x:Name="Shine" Margin="1" Opacity="0.16">

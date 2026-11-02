@@ -19,6 +19,7 @@ public sealed class ClipInfo
     public string? Game { get; set; }
     public string? ThumbnailPath { get; set; }
     public bool Corrupt { get; set; }
+    public bool IsFavorite { get; set; }
 
     public string Title => System.IO.Path.GetFileNameWithoutExtension(Path);
 }
@@ -177,6 +178,12 @@ public sealed class ClipLibrary : IDisposable
         {
             Log.Warn($"Thumbnail failed for {info.Title}: {ex.Message}");
         }
+    }
+
+    public void SetFavorite(ClipInfo clip, bool favorite)
+    {
+        clip.IsFavorite = favorite;
+        SaveCache();
     }
 
     /// <summary>Renames the file. The game tag lives inside the MP4, so it follows along.</summary>

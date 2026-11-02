@@ -15,6 +15,17 @@ public sealed class ClipItem : ObservableObject
 
     public ClipInfo Info { get; }
     public string Title => Info.Title;
+
+    public bool IsFavorite
+    {
+        get => Info.IsFavorite;
+        set
+        {
+            Info.IsFavorite = value;
+            Notify();
+        }
+    }
+
     public string Game => Info.Game ?? "Desktop";
     public string When => Info.Created.ToString("MMM d, yyyy  h:mm tt");
     public string Duration => FormatTime(Info.DurationSeconds);

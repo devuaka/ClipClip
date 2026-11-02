@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -308,7 +308,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
 
     public string VoicePhrase
     {
-        get => S.VoicePhrase;
+        get => _phraseDraft ?? S.VoicePhrase;
         set { _phraseDraft = value; Notify(); }
     }
 

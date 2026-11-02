@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
@@ -54,6 +54,7 @@ public partial class ClipsView : UserControl
             _viewModel.PropertyChanged -= OnViewModelChanged;
             _viewModel.ReleaseMedia -= Release;
             _viewModel.MediaReopen -= Reopen;
+            _viewModel.TrimChanged -= DrawTrim;
         }
         _viewModel = e.NewValue as ClipsViewModel;
         if (_viewModel != null)
@@ -61,6 +62,7 @@ public partial class ClipsView : UserControl
             _viewModel.PropertyChanged += OnViewModelChanged;
             _viewModel.ReleaseMedia += Release;
             _viewModel.MediaReopen += Reopen;
+            _viewModel.TrimChanged += DrawTrim;
         }
     }
 
@@ -158,6 +160,20 @@ public partial class ClipsView : UserControl
     private void OnVolumeChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (_player != null) _player.Volume = e.NewValue;
+    }
+
+    private void OnTrimStart(object sender, RoutedEventArgs e) => _viewModel?.SetTrimStart(Player.Position.TotalSeconds);
+
+    private void OnTrimEnd(object sender, RoutedEventArgs e) => _viewModel?.SetTrimEnd(Player.Position.TotalSeconds);
+
+    private void OnTrimTrackSized(object sender, SizeChangedEventArgs e) => DrawTrim();
+
+    private void DrawTrim()
+    {
+        if (_viewModel == null || _viewModel.ClipLength <= 0) return;
+        double scale = TrimTrack.ActualWidth / _viewModel.ClipLength;
+        TrimFill.Margin = new Thickness(_viewModel.TrimStart * scale, 0, 0, 0);
+        TrimFill.Width = Math.Max(2, (_viewModel.TrimEnd - _viewModel.TrimStart) * scale);
     }
 
     private void OnStartRename(object sender, RoutedEventArgs e) =>

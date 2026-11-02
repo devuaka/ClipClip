@@ -61,9 +61,9 @@ function draw() {
   const middle = (height - 22) / 2;
   const reach = middle - 8;
   const gradient = context.createLinearGradient(0, 0, width, 0);
-  gradient.addColorStop(0, 'rgba(255, 61, 90, 0.22)');
-  gradient.addColorStop(0.75, '#ff3d5a');
-  gradient.addColorStop(1, '#ff8a3d');
+  gradient.addColorStop(0, 'rgba(124, 58, 237, 0.22)');
+  gradient.addColorStop(0.75, '#a855f7');
+  gradient.addColorStop(1, '#c026d3');
   context.fillStyle = gradient;
 
   bars.forEach((level, index) => {
@@ -72,7 +72,7 @@ function draw() {
     context.fillRect(x, middle - size, BAR_WIDTH, size * 2);
   });
 
-  context.fillStyle = '#ff3d5a';
+  context.fillStyle = '#a855f7';
   context.fillRect(width - 2, 0, 2, height);
 }
 
