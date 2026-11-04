@@ -32,6 +32,7 @@ internal static class Tests
         "resize" => ResizeTest(),
         "recovery" => Recovery(),
         "trim" => TrimTest(),
+        "studio" => StudioTest(),
         "recordwindow" => RecordWindow(args[0], int.Parse(args[1]), args[2], args[3]),
         "ring" => RingTests.Run(),
         "gpuload" => GpuLoad.Render(int.Parse(args[0])),
@@ -496,6 +497,31 @@ internal static class Tests
         ClipResult result = engine.SaveClip(directory, game, ClipTrigger.Automation)!.GetAwaiter().GetResult();
         Console.WriteLine(result);
         return result.Success ? 0 : 1;
+    }
+
+    private static int StudioTest()
+    {
+        string directory = Path.Combine(Program.OutputDir, "studio");
+        Directory.CreateDirectory(directory);
+        string source;
+        using (RecordingEngine engine = NewEngine(6))
+        {
+            engine.Start();
+            Thread.Sleep(8000);
+            source = engine.SaveClip(directory, "Studio", ClipTrigger.Automation)!.GetAwaiter().GetResult().Path!;
+        }
+        var project = new ClipClip.Engine.Editing.EditProject { Aspect = ClipClip.Engine.Editing.ExportAspect.Vertical, MusicPath = source, MusicVolume = 0.3f };
+        project.Segments.Add(new() { SourcePath = source, In = 0.5, Out = 2.5, Caption = "Test caption", Placement = ClipClip.Engine.Editing.CaptionPlacement.Top });
+        project.Segments.Add(new() { SourcePath = source, In = 3, Out = 5, Speed = 2, Volume = 0.5f });
+        project.Segments.Add(new() { SourcePath = source, In = 1, Out = 2, Speed = 0.5, Muted = true });
+        var watch = Stopwatch.StartNew();
+        string output = ClipClip.Engine.Editing.Exporter.Export(project, directory, "studio_out", null, CancellationToken.None);
+        ClipProbe probe = ClipProbe.Read(output, true);
+        Console.WriteLine($"export {watch.Elapsed.TotalSeconds:F1}s -> {probe.Width}x{probe.Height} {probe.DurationSeconds:F2}s audio={probe.HasAudio} decodable={probe.HasDecodableVideo}");
+        Thumbnailer.Create(output, Path.Combine(Path.GetTempPath(), "clipclip_studio_thumb.jpg"), 0.5);
+        bool ok = probe.Width == 1080 && probe.Height == 1920 && probe.HasAudio && probe.HasDecodableVideo && probe.DurationSeconds is > 4.5 and < 5.6;
+        Console.WriteLine(ok ? "PASS" : "FAIL");
+        return ok ? 0 : 1;
     }
 
     private static int TrimTest()

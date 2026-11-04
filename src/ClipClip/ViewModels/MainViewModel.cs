@@ -4,7 +4,7 @@ using ClipClip.Engine;
 
 namespace ClipClip.ViewModels;
 
-public enum Page { Home, Clips, Games, Settings }
+public enum Page { Home, Clips, Studio, Games, Settings }
 
 /// <summary>Exists only while the window is open, and polls the engine only while it is visible.</summary>
 public sealed class MainViewModel : ObservableObject, IDisposable
@@ -26,6 +26,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         Clips = new ClipsViewModel(controller, this);
         Games = new GamesViewModel(controller, this);
         Settings = new SettingsViewModel(controller, this);
+        Studio = new StudioViewModel(controller, this);
 
         _timer = new DispatcherTimer(TimeSpan.FromMilliseconds(250), DispatcherPriority.Background, (_, _) => Tick(), dispatcher);
         _noticeTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
@@ -46,6 +47,13 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public ClipsViewModel Clips { get; }
     public GamesViewModel Games { get; }
     public SettingsViewModel Settings { get; }
+    public StudioViewModel Studio { get; }
+
+    public void OpenInStudio(ClipClip.Engine.Library.ClipInfo clip)
+    {
+        Studio.AddClip(clip);
+        Page = Page.Studio;
+    }
 
     public event Action? ClipSaved;
     public event Action? PageChanged;
@@ -60,6 +68,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             Notify(nameof(IsClips));
             Notify(nameof(IsGames));
             Notify(nameof(IsSettings));
+            Notify(nameof(IsStudio));
             if (value != Page.Clips) Clips.ClosePlayer();
             if (value != Page.Settings) Settings.StopMeter();
             PageChanged?.Invoke();
@@ -70,6 +79,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public bool IsClips { get => _page == Page.Clips; set { if (value) Page = Page.Clips; } }
     public bool IsGames { get => _page == Page.Games; set { if (value) Page = Page.Games; } }
     public bool IsSettings { get => _page == Page.Settings; set { if (value) Page = Page.Settings; } }
+    public bool IsStudio { get => _page == Page.Studio; set { if (value) Page = Page.Studio; } }
 
     public string? Notice
     {
@@ -108,5 +118,6 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         Clips.Dispose();
         Games.Dispose();
         Settings.Dispose();
+        Studio.Dispose();
     }
 }

@@ -61,6 +61,10 @@ public sealed class ClipsViewModel : ObservableObject, IDisposable
         OpenClipFolderCommand = new RelayCommand(() => Shell(_controller.Settings.ClipDirectory));
         ToggleFavoriteCommand = new RelayCommand(parameter => ToggleFavorite(ItemFrom(parameter)));
         ToggleEditCommand = new RelayCommand(ToggleEdit);
+        OpenInStudioCommand = new RelayCommand(parameter =>
+        {
+            if (ItemFrom(parameter) is { } item) _main.OpenInStudio(item.Info);
+        });
         SaveTrimCommand = new RelayCommand(SaveTrim);
 
         _libraryChanged = () => Application.Current.Dispatcher.BeginInvoke(Reload);
@@ -84,6 +88,7 @@ public sealed class ClipsViewModel : ObservableObject, IDisposable
     public RelayCommand OpenClipFolderCommand { get; }
     public RelayCommand ToggleFavoriteCommand { get; }
     public RelayCommand ToggleEditCommand { get; }
+    public RelayCommand OpenInStudioCommand { get; }
     public RelayCommand SaveTrimCommand { get; }
 
     /// <summary>The player must let go of a file before it can be renamed or deleted.</summary>

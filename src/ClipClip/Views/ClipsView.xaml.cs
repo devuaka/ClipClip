@@ -79,6 +79,7 @@ public partial class ClipsView : UserControl
         Player.Source = new Uri(item.Info.Path);
         Player.Play();
         SetPlaying(true);
+        Focus();
     }
 
     private void Release()
@@ -150,11 +151,39 @@ public partial class ClipsView : UserControl
         Player.Position = TimeSpan.FromSeconds(Seek.Value);
     }
 
+    // Mark the drag before the click lands, or the position timer pulls the bar back mid-click.
+    private void OnSeekDown(object sender, MouseButtonEventArgs e) => _seeking = true;
+
     private void OnSeekClick(object sender, MouseButtonEventArgs e)
     {
-        if (_seeking) return;
+        _seeking = false;
         Player.Position = TimeSpan.FromSeconds(Seek.Value);
         UpdatePosition();
+    }
+
+    private void Skip(double seconds)
+    {
+        if (_player == null) return;
+        double length = _player.NaturalDuration.HasTimeSpan ? _player.NaturalDuration.TimeSpan.TotalSeconds : double.MaxValue;
+        _player.Position = TimeSpan.FromSeconds(Math.Clamp(_player.Position.TotalSeconds + seconds, 0, length));
+        UpdatePosition();
+    }
+
+    private void OnBack(object sender, RoutedEventArgs e) => Skip(-5);
+
+    private void OnForward(object sender, RoutedEventArgs e) => Skip(5);
+
+    private void OnPlayerKey(object sender, KeyEventArgs e)
+    {
+        if (_viewModel?.IsPlayerOpen != true || e.OriginalSource is TextBox) return;
+        switch (e.Key)
+        {
+            case Key.Left: Skip(Keyboard.Modifiers == ModifierKeys.Shift ? -1 : -5); break;
+            case Key.Right: Skip(Keyboard.Modifiers == ModifierKeys.Shift ? 1 : 5); break;
+            case Key.Space: TogglePlay(); break;
+            default: return;
+        }
+        e.Handled = true;
     }
 
     private void OnVolumeChanged(object sender, RoutedPropertyChangedEventArgs<double> e)

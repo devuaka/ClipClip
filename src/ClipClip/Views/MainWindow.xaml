@@ -42,6 +42,12 @@
                         <TextBlock Text="My Clips" FontSize="11" Margin="0,4,0,0" HorizontalAlignment="Center" />
                     </StackPanel>
                 </RadioButton>
+                <RadioButton Style="{StaticResource NavItem}" GroupName="Nav" IsChecked="{Binding IsStudio}" AutomationProperties.Name="Studio">
+                    <StackPanel>
+                        <Path Style="{StaticResource Icon}" Data="{StaticResource IconStudio}" />
+                        <TextBlock Text="Studio" FontSize="11" Margin="0,4,0,0" HorizontalAlignment="Center" />
+                    </StackPanel>
+                </RadioButton>
                 <RadioButton Style="{StaticResource NavItem}" GroupName="Nav" IsChecked="{Binding IsGames}" AutomationProperties.Name="Games">
                     <StackPanel>
                         <Path Style="{StaticResource Icon}" Data="{StaticResource IconGames}" />
@@ -99,6 +105,7 @@
             <Grid x:Name="Pages" Grid.Row="1" Margin="4,0,28,20">
                 <v:HomeView DataContext="{Binding Home}" Visibility="{Binding DataContext.IsHome, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolVisible}}" />
                 <v:ClipsView DataContext="{Binding Clips}" Visibility="{Binding DataContext.IsClips, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolVisible}}" />
+                <v:StudioView DataContext="{Binding Studio}" Visibility="{Binding DataContext.IsStudio, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolVisible}}" />
                 <v:GamesView DataContext="{Binding Games}" Visibility="{Binding DataContext.IsGames, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolVisible}}" />
                 <v:SettingsView DataContext="{Binding Settings}" Visibility="{Binding DataContext.IsSettings, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolVisible}}" />
             </Grid>

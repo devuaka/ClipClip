@@ -1,6 +1,7 @@
 <UserControl x:Class="ClipClip.Views.ClipsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Focusable="True" PreviewKeyDown="OnPlayerKey">
     <UserControl.Resources>
         <Style x:Key="StarIcon" TargetType="Path" BasedOn="{StaticResource Icon}">
             <Setter Property="Data" Value="{StaticResource IconStar}" />
@@ -100,6 +101,7 @@
                                     <ContextMenu>
                                         <MenuItem Header="Play" Command="{Binding PlacementTarget.Tag.PlayCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="{Binding}" />
                                         <MenuItem Header="Export a copy" Command="{Binding PlacementTarget.Tag.ExportCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="{Binding}" />
+                                        <MenuItem Header="Edit in Studio" Command="{Binding PlacementTarget.Tag.OpenInStudioCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="{Binding}" />
                                         <MenuItem Header="Copy to clipboard" Command="{Binding PlacementTarget.Tag.CopyCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="{Binding}" />
                                         <MenuItem Header="Show in File Explorer" Command="{Binding PlacementTarget.Tag.OpenFolderCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="{Binding}" />
                                         <MenuItem Header="Open in default player" Command="{Binding PlacementTarget.Tag.OpenExternalCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="{Binding}" />
@@ -175,7 +177,10 @@
                     <Button Style="{StaticResource IconButton}" Command="{Binding ToggleFavoriteCommand}" ToolTip="Favorite" AutomationProperties.Name="Favorite">
                         <Path Style="{StaticResource StarIcon}" DataContext="{Binding Playing}" />
                     </Button>
-                    <Button Style="{StaticResource IconButton}" Command="{Binding ToggleEditCommand}" ToolTip="Trim and edit" AutomationProperties.Name="Edit clip">
+                    <Button Style="{StaticResource IconButton}" Command="{Binding OpenInStudioCommand}" ToolTip="Edit in Studio" AutomationProperties.Name="Edit in Studio">
+                        <Path Style="{StaticResource Icon}" Data="{StaticResource IconStudio}" />
+                    </Button>
+                    <Button Style="{StaticResource IconButton}" Command="{Binding ToggleEditCommand}" ToolTip="Quick trim" AutomationProperties.Name="Edit clip">
                         <Path Style="{StaticResource Icon}" Data="{StaticResource IconScissors}" />
                     </Button>
                     <Button Style="{StaticResource IconButton}" Command="{Binding CopyCommand}" ToolTip="Copy to clipboard" AutomationProperties.Name="Copy">
@@ -212,13 +217,17 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="110" />
                 </Grid.ColumnDefinitions>
-                <Button Style="{StaticResource IconButton}" Click="OnPlayPause" AutomationProperties.Name="Play or pause">
-                    <Path x:Name="PlayGlyph" Style="{StaticResource Icon}" Data="{StaticResource IconPause}" />
-                </Button>
+                <StackPanel Orientation="Horizontal">
+                    <Button Style="{StaticResource GhostButton}" Padding="8,6" Content="-5s" Click="OnBack" ToolTip="Back 5 seconds (Left arrow)" AutomationProperties.Name="Back 5 seconds" />
+                    <Button Style="{StaticResource IconButton}" Click="OnPlayPause" ToolTip="Play or pause (Space)" AutomationProperties.Name="Play or pause">
+                        <Path x:Name="PlayGlyph" Style="{StaticResource Icon}" Data="{StaticResource IconPause}" />
+                    </Button>
+                    <Button Style="{StaticResource GhostButton}" Padding="8,6" Content="+5s" Click="OnForward" ToolTip="Forward 5 seconds (Right arrow)" AutomationProperties.Name="Forward 5 seconds" />
+                </StackPanel>
                 <TextBlock x:Name="PositionText" Grid.Column="1" Text="0:00" FontFamily="{StaticResource Display}" Foreground="{StaticResource TextDim}" Width="44" TextAlignment="Right"
                            VerticalAlignment="Center" Margin="4,0,12,0" />
                 <Slider x:Name="Seek" Grid.Column="2" VerticalAlignment="Center" Minimum="0" Maximum="1"
-                        Thumb.DragStarted="OnSeekStart" Thumb.DragCompleted="OnSeekEnd" PreviewMouseLeftButtonUp="OnSeekClick" AutomationProperties.Name="Seek" />
+                        Thumb.DragStarted="OnSeekStart" Thumb.DragCompleted="OnSeekEnd" PreviewMouseLeftButtonDown="OnSeekDown" PreviewMouseLeftButtonUp="OnSeekClick" AutomationProperties.Name="Seek" />
                 <TextBlock x:Name="DurationText" Grid.Column="3" Text="0:00" FontFamily="{StaticResource Display}" Foreground="{StaticResource TextDim}" VerticalAlignment="Center" Margin="12,0" />
                 <Path Grid.Column="4" Style="{StaticResource Icon}" Data="{StaticResource IconVolume}" Stroke="{StaticResource TextDim}" Margin="0,0,8,0" />
                 <Slider x:Name="Volume" Grid.Column="5" VerticalAlignment="Center" Minimum="0" Maximum="1" Value="0.8" ValueChanged="OnVolumeChanged" AutomationProperties.Name="Volume" />

@@ -1,0 +1,207 @@
+<UserControl x:Class="ClipClip.Views.StudioView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Margin="0,0,0,14">
+            <StackPanel>
+                <TextBlock Style="{StaticResource H1}" Text="Studio" />
+                <TextBlock Style="{StaticResource Dim}" FontSize="14" Text="{Binding TotalText}" Margin="0,4,0,0" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <ComboBox Width="300" ItemsSource="{Binding LibraryClips}" SelectedItem="{Binding ClipToAdd}" DisplayMemberPath="Label" AutomationProperties.Name="Clip to add" />
+                <Button Style="{StaticResource PrimaryButton}" Margin="10,0,0,0" Command="{Binding AddCommand}" AutomationProperties.Name="Add to timeline">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Style="{StaticResource Icon}" Data="{StaticResource IconPlus}" Stroke="White" Margin="-4,0,6,0" />
+                        <TextBlock Text="Add to timeline" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!-- Preview and inspector -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="300" />
+            </Grid.ColumnDefinitions>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Border Background="Black" CornerRadius="14" ClipToBounds="True">
+                    <Grid x:Name="Stage" SizeChanged="OnStageSized" MouseLeftButtonUp="OnStageClick" Background="Transparent">
+                        <Border x:Name="PreviewHost" />
+                        <Rectangle x:Name="CropFrame" Stroke="White" StrokeThickness="1.5" StrokeDashArray="4 3" Opacity="0.8"
+                                   HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False" Visibility="Collapsed" />
+                        <Border x:Name="CaptionBox" HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False">
+                            <TextBlock Text="{Binding Selected.Caption}" VerticalAlignment="{Binding Selected.CaptionAlignment}" Margin="12,16"
+                                       HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" FontFamily="{StaticResource Display}"
+                                       FontWeight="Bold" FontSize="26" Foreground="White">
+                                <TextBlock.Effect>
+                                    <DropShadowEffect BlurRadius="6" ShadowDepth="0" Color="Black" Opacity="1" />
+                                </TextBlock.Effect>
+                            </TextBlock>
+                        </Border>
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding HasSegments, Converter={StaticResource BoolHidden}}">
+                            <TextBlock Style="{StaticResource H2}" HorizontalAlignment="Center" Text="Your timeline is empty" />
+                            <TextBlock Style="{StaticResource Dim}" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,6,0,0" MaxWidth="360"
+                                       Text="Pick a clip at the top and add it, or open any clip in My Clips and choose Edit in Studio." />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <Grid Grid.Row="1" Margin="0,10,0,0" IsEnabled="{Binding HasSelection}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Button Style="{StaticResource IconButton}" Click="OnPlayPause" AutomationProperties.Name="Play preview">
+                        <Path x:Name="PlayGlyph" Style="{StaticResource Icon}" Data="{StaticResource IconPlay}" />
+                    </Button>
+                    <TextBlock x:Name="TimeText" Grid.Column="1" Text="0:00" FontFamily="{StaticResource Display}" Foreground="{StaticResource TextDim}"
+                               VerticalAlignment="Center" Margin="6,0,12,0" Width="44" />
+                    <Slider x:Name="Scrub" Grid.Column="2" VerticalAlignment="Center" Minimum="0" Maximum="1"
+                            PreviewMouseLeftButtonDown="OnScrubDown" PreviewMouseLeftButtonUp="OnScrubUp"
+                            Thumb.DragStarted="OnScrubDown" Thumb.DragCompleted="OnScrubUp" AutomationProperties.Name="Preview position" />
+                    <Button Grid.Column="3" Margin="12,0,0,0" Command="{Binding SplitCommand}" AutomationProperties.Name="Split here">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Style="{StaticResource Icon}" Data="{StaticResource IconScissors}" Margin="-4,0,6,0" />
+                            <TextBlock Text="Split here" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Grid>
+
+            <Border Grid.Column="2" Style="{StaticResource Card}" Padding="16,14">
+                <Grid>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Visibility="{Binding HasSelection, Converter={StaticResource BoolVisible}}">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource Eyebrow}" Text="SELECTED PIECE" />
+                            <TextBlock Style="{StaticResource H2}" Text="{Binding Selected.Title}" TextTrimming="CharacterEllipsis" Margin="0,4,0,2" />
+                            <TextBlock Style="{StaticResource Faint}" Text="{Binding Selected.DurationText}" />
+
+                            <TextBlock Style="{StaticResource Eyebrow}" Text="SPEED" Margin="0,16,0,6" />
+                            <ComboBox ItemsSource="{Binding SpeedChoices}" SelectedItem="{Binding SelectedSpeed}" DisplayMemberPath="Label" AutomationProperties.Name="Speed" />
+
+                            <TextBlock Style="{StaticResource Eyebrow}" Text="VOLUME" Margin="0,16,0,6" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Slider Minimum="0" Maximum="2" Value="{Binding Selected.Volume}" IsEnabled="{Binding Selected.Muted, Converter={StaticResource Not}}"
+                                        VerticalAlignment="Center" AutomationProperties.Name="Piece volume" />
+                                <CheckBox Grid.Column="1" Style="{StaticResource Switch}" IsChecked="{Binding Selected.Muted}" Margin="12,0,0,0" AutomationProperties.Name="Mute piece">
+                                    <TextBlock Text="Mute" Foreground="{StaticResource TextDim}" FontSize="13" Margin="0,0,8,0" />
+                                </CheckBox>
+                            </Grid>
+
+                            <TextBlock Style="{StaticResource Eyebrow}" Text="TEXT" Margin="0,16,0,6" />
+                            <TextBox Text="{Binding Selected.Caption, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" MinHeight="60"
+                                     TextWrapping="Wrap" VerticalContentAlignment="Top" AutomationProperties.Name="Caption" />
+                            <ComboBox ItemsSource="{Binding PlacementChoices}" SelectedItem="{Binding SelectedPlacement}" DisplayMemberPath="Label"
+                                      Margin="0,8,0,0" AutomationProperties.Name="Caption position" />
+
+                            <UniformGrid Columns="2" Margin="0,18,0,0">
+                                <Button Content="Move left" Margin="0,0,4,8" Command="{Binding MoveLeftCommand}" />
+                                <Button Content="Move right" Margin="4,0,0,8" Command="{Binding MoveRightCommand}" />
+                                <Button Content="Duplicate" Margin="0,0,4,0" Command="{Binding DuplicateCommand}" />
+                                <Button Content="Delete" Margin="4,0,0,0" Command="{Binding DeleteCommand}" Foreground="{StaticResource Warn}" />
+                            </UniformGrid>
+                        </StackPanel>
+                    </ScrollViewer>
+                    <TextBlock Style="{StaticResource Dim}" TextAlignment="Center" VerticalAlignment="Center"
+                               Text="Select a piece on the timeline to change its speed, volume and text."
+                               Visibility="{Binding HasSelection, Converter={StaticResource BoolHidden}}" />
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Timeline -->
+        <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,14,0,0" Padding="10" Height="92">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding Segments}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Width="{Binding TimelineWidth}" Height="64" Margin="0,0,6,0" Padding="10,6" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                    Command="{Binding DataContext.SelectCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"
+                                    AutomationProperties.Name="{Binding Title}" ToolTip="{Binding Title}">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource BaseButton}">
+                                        <Setter Property="Background" Value="{StaticResource Bg3}" />
+                                        <Setter Property="BorderBrush" Value="Transparent" />
+                                        <Setter Property="BorderThickness" Value="2" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                <Setter Property="BorderBrush" Value="{StaticResource Live}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                                <Grid>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding DurationText}" FontSize="11" Foreground="{StaticResource TextDim}" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                    <TextBlock Text="T" FontWeight="Bold" FontSize="11" Foreground="{StaticResource Live}" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                               Visibility="{Binding HasCaption, Converter={StaticResource BoolVisible}}" ToolTip="Has text" />
+                                </Grid>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Export -->
+        <Grid Grid.Row="3" Margin="0,14,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="260" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <ComboBox ItemsSource="{Binding AspectChoices}" SelectedItem="{Binding Aspect}" DisplayMemberPath="Label" AutomationProperties.Name="Video shape" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,0,0" VerticalAlignment="Center">
+                <Button Content="Music..." Command="{Binding ChooseMusicCommand}" AutomationProperties.Name="Choose music" />
+                <TextBlock Text="{Binding MusicName}" Foreground="{StaticResource TextDim}" FontSize="13" VerticalAlignment="Center" Margin="10,0" MaxWidth="160" TextTrimming="CharacterEllipsis" />
+                <Slider Width="90" Minimum="0" Maximum="1" Value="{Binding MusicVolume}" VerticalAlignment="Center" Visibility="{Binding HasMusic, Converter={StaticResource BoolVisible}}" AutomationProperties.Name="Music volume" />
+                <Button Style="{StaticResource IconButton}" Command="{Binding ClearMusicCommand}" ToolTip="Remove music" Visibility="{Binding HasMusic, Converter={StaticResource BoolVisible}}">
+                    <Path Style="{StaticResource Icon}" Data="{StaticResource IconClose}" />
+                </Button>
+            </StackPanel>
+            <StackPanel Grid.Column="2" Margin="14,0" VerticalAlignment="Center">
+                <TextBlock Text="{Binding Status}" Style="{StaticResource Dim}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                <ProgressBar Height="5" Margin="0,5,0,0" Maximum="1" Value="{Binding Progress, Mode=OneWay}" Foreground="{StaticResource Live}" Background="{StaticResource Bg3}"
+                             BorderThickness="0" Visibility="{Binding IsExporting, Converter={StaticResource BoolVisible}}" />
+            </StackPanel>
+            <StackPanel Grid.Column="3" Orientation="Horizontal">
+                <Button Content="Watch it" Margin="0,0,8,0" Command="{Binding ShowResultCommand}" Visibility="{Binding HasResult, Converter={StaticResource BoolVisible}}" />
+                <Button Content="Cancel" Margin="0,0,8,0" Command="{Binding CancelCommand}" Visibility="{Binding IsExporting, Converter={StaticResource BoolVisible}}" />
+                <Button Style="{StaticResource PrimaryButton}" Command="{Binding ExportCommand}" IsEnabled="{Binding HasSegments}" AutomationProperties.Name="Export video">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Style="{StaticResource Icon}" Data="{StaticResource IconExport}" Stroke="White" Margin="-4,0,6,0" />
+                        <TextBlock Text="Export video" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>
