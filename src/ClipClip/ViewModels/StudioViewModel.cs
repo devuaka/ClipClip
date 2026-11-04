@@ -6,157 +6,103 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Threading;
 using ClipClip.Engine;
+using ClipClip.Engine.Audio;
 using ClipClip.Engine.Editing;
 using ClipClip.Engine.Library;
 using Microsoft.Win32;
+using NAudio.Wave;
 
 namespace ClipClip.ViewModels;
 
-public sealed class SegmentItem : ObservableObject
-{
-    private bool _isSelected;
+public enum StudioTab { Media, Text, Stickers, Audio }
 
-    public SegmentItem(EditSegment segment, string title, double sourceLength)
-    {
-        Segment = segment;
-        Title = title;
-        SourceLength = sourceLength;
-    }
-
-    public EditSegment Segment { get; }
-    public string Title { get; }
-    public double SourceLength { get; }
-
-    public double In => Segment.In;
-    public double Out => Segment.Out;
-
-    public void SetRange(double start, double end)
-    {
-        Segment.In = start;
-        Segment.Out = end;
-        Changed();
-    }
-
-    public double Speed
-    {
-        get => Segment.Speed;
-        set
-        {
-            Segment.Speed = value;
-            Notify();
-            Changed();
-        }
-    }
-
-    public double Volume
-    {
-        get => Segment.Volume;
-        set
-        {
-            Segment.Volume = (float)value;
-            Notify();
-        }
-    }
-
-    public bool Muted
-    {
-        get => Segment.Muted;
-        set
-        {
-            Segment.Muted = value;
-            Notify();
-        }
-    }
-
-    public string Caption
-    {
-        get => Segment.Caption ?? "";
-        set
-        {
-            Segment.Caption = value;
-            Notify();
-            Notify(nameof(HasCaption));
-        }
-    }
-
-    public bool HasCaption => !string.IsNullOrWhiteSpace(Segment.Caption);
-
-    public CaptionPlacement Placement
-    {
-        get => Segment.Placement;
-        set
-        {
-            Segment.Placement = value;
-            Notify();
-            Notify(nameof(CaptionAlignment));
-        }
-    }
-
-    public VerticalAlignment CaptionAlignment => Segment.Placement switch
-    {
-        CaptionPlacement.Top => VerticalAlignment.Top,
-        CaptionPlacement.Middle => VerticalAlignment.Center,
-        _ => VerticalAlignment.Bottom,
-    };
-
-    public bool IsSelected { get => _isSelected; set => Set(ref _isSelected, value); }
-
-    public double TimelineWidth => Math.Clamp(Segment.OutputSeconds * 18, 76, 900);
-    public string DurationText => ClipItem.FormatTime(Segment.OutputSeconds) + (Segment.Speed != 1 ? $"  ·  {Segment.Speed}x" : "");
-
-    private void Changed()
-    {
-        Notify(nameof(TimelineWidth));
-        Notify(nameof(DurationText));
-    }
-
-    public SegmentItem Clone() => new(Segment.Clone(), Title, SourceLength);
-}
-
-/// <summary>The Studio: a timeline of pieces from any clips, rendered to one new video.</summary>
+/// <summary>
+/// The editor. The project is plain data; every change goes through <see cref="Commit"/>, which
+/// records an undo step, saves after a short pause and tells the timeline and preview to redraw.
+/// </summary>
 public sealed class StudioViewModel : ObservableObject, IDisposable
 {
+    private const int HistoryLimit = 150;
+
     private readonly ClipController _controller;
     private readonly MainViewModel _main;
     private readonly Action _libraryChanged;
-    private SegmentItem? _selected;
-    private Choice<ClipInfo>? _clipToAdd;
-    private Choice<ExportAspect> _aspect;
-    private string? _musicPath;
-    private double _musicVolume = 0.5;
+    private readonly DispatcherTimer _saveTimer;
+    private readonly List<string> _history = [];
+    private int _historyIndex = -1;
+    private string? _lastCommitKey;
+    private DateTime _lastCommitTime;
+
+    private EditorProject _project = new();
+    private object? _selected;
+    private double _playhead;
+    private double _pixelsPerSecond = 40;
+    private StudioTab _tab = StudioTab.Media;
     private bool _isExporting;
     private double _progress;
     private string _status = "";
     private string? _resultPath;
     private CancellationTokenSource? _cancel;
 
+    private WaveFileWriter? _voiceWriter;
+    private string? _voicePath;
+    private double _voiceStart;
+    private readonly AudioSink _voiceSink;
+
     public StudioViewModel(ClipController controller, MainViewModel main)
     {
         _controller = controller;
         _main = main;
-        AspectChoices =
-        [
-            new("Landscape, like the original", ExportAspect.Original),
-            new("Vertical 9:16, for TikTok and Shorts", ExportAspect.Vertical),
-            new("Square 1:1", ExportAspect.Square),
-        ];
-        _aspect = AspectChoices[0];
-        SpeedChoices = [new("0.25x", 0.25), new("0.5x", 0.5), new("1x", 1), new("1.5x", 1.5), new("2x", 2)];
-        PlacementChoices = [new("Top", CaptionPlacement.Top), new("Middle", CaptionPlacement.Middle), new("Bottom", CaptionPlacement.Bottom)];
-
-        AddCommand = new RelayCommand(() =>
+        unsafe { _voiceSink = OnVoiceSamples; }
+        _saveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(800) };
+        _saveTimer.Tick += (_, _) =>
         {
-            if (_clipToAdd != null) AddClip(_clipToAdd.Value);
-        });
-        SelectCommand = new RelayCommand(parameter => Selected = parameter as SegmentItem);
+            _saveTimer.Stop();
+            ProjectStore.Save(_project);
+            RefreshProjects();
+        };
+
+        AspectChoices = [new("Landscape (original)", ExportAspect.Original), new("Vertical 9:16", ExportAspect.Vertical), new("Square 1:1", ExportAspect.Square)];
+        FpsChoices = [new("30 fps", 30), new("60 fps", 60)];
+        SpeedChoices = [new("0.25x", 0.25), new("0.5x", 0.5), new("0.75x", 0.75), new("1x", 1.0), new("1.5x", 1.5), new("2x", 2.0), new("3x", 3.0), new("4x", 4.0)];
+        FilterChoices = [new("None", FilterPreset.None), new("Vivid", FilterPreset.Vivid), new("Warm", FilterPreset.Warm), new("Cool", FilterPreset.Cool), new("Black and white", FilterPreset.Mono), new("Faded", FilterPreset.Faded)];
+        MotionChoices = [new("None", MotionEffect.None), new("Slow zoom", MotionEffect.SlowZoom), new("Camera shake", MotionEffect.Shake)];
+        TransitionChoices = [new("None", TransitionKind.None), new("Fade from black", TransitionKind.Fade), new("White flash", TransitionKind.Flash), new("Zoom punch", TransitionKind.Zoom)];
+        AnimationChoices = [new("None", LayerAnimation.None), new("Pop in", LayerAnimation.Pop), new("Fade", LayerAnimation.Fade), new("Slide up", LayerAnimation.SlideUp)];
+        FontChoices = new[] { "Bahnschrift", "Segoe UI", "Impact", "Arial Black", "Comic Sans MS", "Georgia", "Consolas" }
+            .Where(f => System.Drawing.FontFamily.Families.Any(family => family.Name == f)).ToList();
+        ColorChoices = ["#FFFFFF", "#FFE14D", "#FF4D6D", "#A855F7", "#38BDF8", "#4ADE80", "#FB923C", "#111111"];
+
+        Stickers = new ObservableCollection<string>(StickerLibrary.EnsureBuiltIns());
+
+        AddMediaCommand = new RelayCommand(p => { if (p is ClipItem item) AddClip(item.Info); });
+        ImportVideoCommand = new RelayCommand(ImportVideo);
+        AddTextCommand = new RelayCommand(p => AddText(p as string ?? "title"));
+        AddStickerCommand = new RelayCommand(p => { if (p is string path) AddSticker(path); });
+        ImportStickerCommand = new RelayCommand(ImportSticker);
+        ImportAudioCommand = new RelayCommand(ImportAudio);
+        RecordVoiceCommand = new RelayCommand(ToggleVoiceover);
         SplitCommand = new RelayCommand(Split);
         DeleteCommand = new RelayCommand(Delete);
         DuplicateCommand = new RelayCommand(Duplicate);
-        MoveLeftCommand = new RelayCommand(() => Move(-1));
-        MoveRightCommand = new RelayCommand(() => Move(1));
-        ChooseMusicCommand = new RelayCommand(ChooseMusic);
-        ClearMusicCommand = new RelayCommand(() => MusicPath = null);
+        UndoCommand = new RelayCommand(Undo);
+        RedoCommand = new RelayCommand(Redo);
+        NewProjectCommand = new RelayCommand(NewProject);
+        OpenProjectCommand = new RelayCommand(p => { if (p is ProjectEntry entry) Open(entry.Id); });
+        DeleteProjectCommand = new RelayCommand(DeleteProject);
+        SetColorCommand = new RelayCommand(p =>
+        {
+            if (p is string color && SelectedLayer != null)
+            {
+                SelectedLayer.Color = color;
+                Commit("color");
+            }
+        });
+        TabCommand = new RelayCommand(p => { if (p is string name && Enum.TryParse(name, out StudioTab tab)) Tab = tab; });
+        ZoomInCommand = new RelayCommand(() => PixelsPerSecond *= 1.4);
+        ZoomOutCommand = new RelayCommand(() => PixelsPerSecond /= 1.4);
         ExportCommand = new RelayCommand(Export);
         CancelCommand = new RelayCommand(() => _cancel?.Cancel());
         ShowResultCommand = new RelayCommand(() =>
@@ -167,207 +113,590 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
             _main.Clips.Play(clip);
         });
 
-        _libraryChanged = () => Application.Current.Dispatcher.BeginInvoke(ReloadLibrary);
+        _libraryChanged = () => Application.Current.Dispatcher.BeginInvoke(ReloadMedia);
         controller.Library.Changed += _libraryChanged;
-        ReloadLibrary();
+        ReloadMedia();
+
+        ProjectEntry? recent = ProjectStore.List().FirstOrDefault();
+        LoadProject(recent != null ? ProjectStore.Load(recent.Id) ?? new EditorProject() : new EditorProject());
     }
 
-    public ObservableCollection<SegmentItem> Segments { get; } = [];
-    public ObservableCollection<Choice<ClipInfo>> LibraryClips { get; } = [];
+    // Lists for the inspector and toolbars.
     public IReadOnlyList<Choice<ExportAspect>> AspectChoices { get; }
+    public IReadOnlyList<Choice<int>> FpsChoices { get; }
     public IReadOnlyList<Choice<double>> SpeedChoices { get; }
-    public IReadOnlyList<Choice<CaptionPlacement>> PlacementChoices { get; }
+    public IReadOnlyList<Choice<FilterPreset>> FilterChoices { get; }
+    public IReadOnlyList<Choice<MotionEffect>> MotionChoices { get; }
+    public IReadOnlyList<Choice<TransitionKind>> TransitionChoices { get; }
+    public IReadOnlyList<Choice<LayerAnimation>> AnimationChoices { get; }
+    public IReadOnlyList<string> FontChoices { get; }
+    public IReadOnlyList<string> ColorChoices { get; }
+    public ObservableCollection<string> Stickers { get; }
+    public ObservableCollection<ClipItem> Media { get; } = [];
+    public ObservableCollection<ProjectEntry> Projects { get; } = [];
 
-    public RelayCommand AddCommand { get; }
-    public RelayCommand SelectCommand { get; }
+    public RelayCommand AddMediaCommand { get; }
+    public RelayCommand ImportVideoCommand { get; }
+    public RelayCommand AddTextCommand { get; }
+    public RelayCommand AddStickerCommand { get; }
+    public RelayCommand ImportStickerCommand { get; }
+    public RelayCommand ImportAudioCommand { get; }
+    public RelayCommand RecordVoiceCommand { get; }
     public RelayCommand SplitCommand { get; }
     public RelayCommand DeleteCommand { get; }
     public RelayCommand DuplicateCommand { get; }
-    public RelayCommand MoveLeftCommand { get; }
-    public RelayCommand MoveRightCommand { get; }
-    public RelayCommand ChooseMusicCommand { get; }
-    public RelayCommand ClearMusicCommand { get; }
+    public RelayCommand UndoCommand { get; }
+    public RelayCommand RedoCommand { get; }
+    public RelayCommand NewProjectCommand { get; }
+    public RelayCommand OpenProjectCommand { get; }
+    public RelayCommand DeleteProjectCommand { get; }
+    public RelayCommand SetColorCommand { get; }
+    public RelayCommand TabCommand { get; }
+    public RelayCommand ZoomInCommand { get; }
+    public RelayCommand ZoomOutCommand { get; }
     public RelayCommand ExportCommand { get; }
     public RelayCommand CancelCommand { get; }
     public RelayCommand ShowResultCommand { get; }
 
-    /// <summary>Where the preview is, in seconds of the selected piece's source clip.</summary>
-    public double Playhead { get; set; }
+    /// <summary>The project changed: redraw the timeline and the preview.</summary>
+    public event Action? ProjectChanged;
 
-    public event Action? SelectionChanged;
+    public EditorProject Project => _project;
 
-    public SegmentItem? Selected
+    public string ProjectName
+    {
+        get => _project.Name;
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value) || value == _project.Name) return;
+            _project.Name = value.Trim();
+            Commit("name");
+        }
+    }
+
+    public StudioTab Tab
+    {
+        get => _tab;
+        set
+        {
+            if (!Set(ref _tab, value)) return;
+            Notify(nameof(IsMediaTab));
+            Notify(nameof(IsTextTab));
+            Notify(nameof(IsStickersTab));
+            Notify(nameof(IsAudioTab));
+        }
+    }
+
+    public bool IsMediaTab { get => _tab == StudioTab.Media; set { if (value) Tab = StudioTab.Media; } }
+    public bool IsTextTab { get => _tab == StudioTab.Text; set { if (value) Tab = StudioTab.Text; } }
+    public bool IsStickersTab { get => _tab == StudioTab.Stickers; set { if (value) Tab = StudioTab.Stickers; } }
+    public bool IsAudioTab { get => _tab == StudioTab.Audio; set { if (value) Tab = StudioTab.Audio; } }
+
+    public double PixelsPerSecond
+    {
+        get => _pixelsPerSecond;
+        set
+        {
+            if (Set(ref _pixelsPerSecond, Math.Clamp(value, 6, 400))) ProjectChanged?.Invoke();
+        }
+    }
+
+    public double Playhead
+    {
+        get => _playhead;
+        set
+        {
+            double clamped = Math.Clamp(value, 0, Math.Max(0, _project.Duration - 0.001));
+            if (Set(ref _playhead, clamped)) Notify(nameof(TimeText));
+        }
+    }
+
+    public string TimeText => $"{Format(_playhead)} / {Format(_project.Duration)}";
+
+    private static string Format(double seconds) =>
+        TimeSpan.FromSeconds(Math.Max(0, seconds)).ToString(seconds >= 3600 ? @"h\:mm\:ss\.f" : @"m\:ss\.f");
+
+    public bool HasClips => _project.Video.Count > 0;
+
+    public ExportAspect Aspect
+    {
+        get => _project.Aspect;
+        set
+        {
+            if (value == _project.Aspect) return;
+            _project.Aspect = value;
+            Commit("aspect");
+        }
+    }
+
+    public int Fps
+    {
+        get => _project.Fps;
+        set
+        {
+            if (value == _project.Fps) return;
+            _project.Fps = value;
+            Commit("fps");
+        }
+    }
+
+    // Selection
+    public object? Selected
     {
         get => _selected;
         set
         {
-            if (_selected == value) return;
-            if (_selected != null) _selected.IsSelected = false;
-            _selected = value;
-            if (_selected != null) _selected.IsSelected = true;
-            Notify();
-            Notify(nameof(HasSelection));
-            Notify(nameof(SelectedSpeed));
-            Notify(nameof(SelectedPlacement));
-            SelectionChanged?.Invoke();
+            if (!Set(ref _selected, value)) return;
+            NotifySelection();
         }
     }
 
+    public VideoClip? SelectedVideo => _selected as VideoClip;
+    public OverlayLayer? SelectedLayer => _selected as OverlayLayer;
+    public AudioClip? SelectedAudio => _selected as AudioClip;
+    public bool IsVideoSelected => _selected is VideoClip;
+    public bool IsTextSelected => _selected is OverlayLayer { Kind: LayerKind.Text };
+    public bool IsStickerSelected => _selected is OverlayLayer { Kind: LayerKind.Sticker };
+    public bool IsAudioSelected => _selected is AudioClip;
     public bool HasSelection => _selected != null;
-    public bool HasSegments => Segments.Count > 0;
-    public string TotalText => $"{Segments.Count} {(Segments.Count == 1 ? "piece" : "pieces")}  ·  {ClipItem.FormatTime(Segments.Sum(s => s.Segment.OutputSeconds))} total";
 
-    public Choice<ClipInfo>? ClipToAdd { get => _clipToAdd; set => Set(ref _clipToAdd, value); }
-
-    public Choice<double>? SelectedSpeed
+    private void NotifySelection()
     {
-        get => _selected == null ? null : SpeedChoices.FirstOrDefault(c => c.Value == _selected.Speed);
-        set
+        foreach (string name in new[] { nameof(SelectedVideo), nameof(SelectedLayer), nameof(SelectedAudio), nameof(IsVideoSelected),
+                     nameof(IsTextSelected), nameof(IsStickerSelected), nameof(IsAudioSelected), nameof(HasSelection) })
+            Notify(name);
+        ProjectChanged?.Invoke();
+    }
+
+    // Undo, redo and saving
+
+    /// <summary>Records the current state as an undo step. Rapid edits with the same key, such
+    /// as dragging a slider, merge into one step.</summary>
+    public void Commit(string key)
+    {
+        string json = _project.ToJson();
+        if (_historyIndex >= 0 && _historyIndex < _history.Count && _history[_historyIndex] == json)
         {
-            if (_selected == null || value == null) return;
-            _selected.Speed = value.Value;
-            Notify();
-            Notify(nameof(TotalText));
-            SelectionChanged?.Invoke();
+            Changed();
+            return;
+        }
+        bool merge = key == _lastCommitKey && DateTime.Now - _lastCommitTime < TimeSpan.FromMilliseconds(700) && _historyIndex > 0;
+        if (_historyIndex < _history.Count - 1) _history.RemoveRange(_historyIndex + 1, _history.Count - _historyIndex - 1);
+        if (merge) _history[_historyIndex] = json;
+        else
+        {
+            _history.Add(json);
+            if (_history.Count > HistoryLimit) _history.RemoveAt(0);
+            _historyIndex = _history.Count - 1;
+        }
+        _lastCommitKey = key;
+        _lastCommitTime = DateTime.Now;
+        Changed();
+        _saveTimer.Stop();
+        _saveTimer.Start();
+    }
+
+    /// <summary>Redraws without recording a step, for live dragging.</summary>
+    public void Changed()
+    {
+        Notify(nameof(TimeText));
+        Notify(nameof(HasClips));
+        Notify(nameof(ProjectName));
+        Notify(nameof(Aspect));
+        Notify(nameof(Fps));
+        Playhead = _playhead;
+        ProjectChanged?.Invoke();
+    }
+
+    private void Undo()
+    {
+        if (_historyIndex <= 0) return;
+        _historyIndex--;
+        Restore();
+    }
+
+    private void Redo()
+    {
+        if (_historyIndex >= _history.Count - 1) return;
+        _historyIndex++;
+        Restore();
+    }
+
+    private void Restore()
+    {
+        string? selectedId = SelectedId();
+        _project = EditorProject.FromJson(_history[_historyIndex]);
+        _lastCommitKey = null;
+        Selected = FindById(selectedId);
+        NotifySelection();
+        Changed();
+        _saveTimer.Stop();
+        _saveTimer.Start();
+    }
+
+    private string? SelectedId() => _selected switch
+    {
+        VideoClip v => v.Id,
+        OverlayLayer l => l.Id,
+        AudioClip a => a.Id,
+        _ => null,
+    };
+
+    private object? FindById(string? id) =>
+        id == null ? null :
+        (object?)_project.Video.FirstOrDefault(v => v.Id == id) ??
+        (object?)_project.Layers.FirstOrDefault(l => l.Id == id) ??
+        _project.Audio.FirstOrDefault(a => a.Id == id);
+
+    private void LoadProject(EditorProject project)
+    {
+        if (_saveTimer.IsEnabled)
+        {
+            _saveTimer.Stop();
+            ProjectStore.Save(_project);
+        }
+        _project = project;
+        _history.Clear();
+        _history.Add(project.ToJson());
+        _historyIndex = 0;
+        _lastCommitKey = null;
+        Selected = null;
+        _playhead = 0;
+        Changed();
+        RefreshProjects();
+    }
+
+    private void NewProject() => LoadProject(new EditorProject());
+
+    private void Open(string id)
+    {
+        if (id == _project.Id) return;
+        EditorProject? project = ProjectStore.Load(id);
+        if (project != null) LoadProject(project);
+    }
+
+    private void DeleteProject()
+    {
+        if (!Views.ConfirmDialog.Ask("Delete this project?", $"\"{_project.Name}\" and its voiceovers are removed. Exported videos stay.", "Delete")) return;
+        _saveTimer.Stop();
+        ProjectStore.Delete(_project.Id);
+        ProjectEntry? next = ProjectStore.List().FirstOrDefault();
+        LoadProject(next != null ? ProjectStore.Load(next.Id) ?? new EditorProject() : new EditorProject());
+    }
+
+    private void RefreshProjects()
+    {
+        Projects.Clear();
+        foreach (ProjectEntry entry in ProjectStore.List()) Projects.Add(entry);
+    }
+
+    private void ReloadMedia()
+    {
+        Media.Clear();
+        foreach (ClipInfo clip in _controller.Library.Clips) Media.Add(new ClipItem(clip));
+    }
+
+    // Adding things
+
+    public void AddClip(ClipInfo clip) => AddVideo(clip.Path, clip.Title, clip.DurationSeconds);
+
+    private void AddVideo(string path, string title, double duration)
+    {
+        if (duration <= 0)
+        {
+            try { duration = MediaInfo.Probe(path).Duration; }
+            catch (Exception ex)
+            {
+                _main.ShowNotice("Can't open that video: " + ex.Message);
+                return;
+            }
+        }
+        if (_project.Video.Count == 0 && _project.Name == "Untitled project") _project.Name = title;
+        var clip = new VideoClip { SourcePath = path, Title = title, SourceDuration = duration, In = 0, Out = duration };
+        _project.Video.Add(clip);
+        Selected = clip;
+        Commit("add");
+    }
+
+    private void ImportVideo()
+    {
+        var dialog = new OpenFileDialog { Title = "Add a video", Filter = "Videos|*.mp4;*.mov;*.mkv;*.webm;*.avi|All files|*.*" };
+        if (dialog.ShowDialog() == true) AddVideo(dialog.FileName, Path.GetFileNameWithoutExtension(dialog.FileName), 0);
+    }
+
+    private double LayerStart() => Math.Min(_playhead, Math.Max(0, _project.Duration - 0.5));
+
+    private void AddText(string style)
+    {
+        double start = LayerStart();
+        var layer = new OverlayLayer { Kind = LayerKind.Text, Start = start, End = Math.Min(start + 3, Math.Max(start + 0.5, _project.Duration)) };
+        switch (style)
+        {
+            case "caption":
+                layer.Text = "Caption";
+                layer.Y = 0.82;
+                layer.Size = 0.06;
+                layer.Animation = LayerAnimation.Fade;
+                break;
+            case "callout":
+                layer.Text = "NO WAY";
+                layer.Y = 0.2;
+                layer.Size = 0.1;
+                layer.Color = "#FFE14D";
+                layer.Font = FontChoices.Contains("Impact") ? "Impact" : "Bahnschrift";
+                layer.Animation = LayerAnimation.SlideUp;
+                break;
+            case "subtitle":
+                layer.Text = "Subtitle";
+                layer.Y = 0.9;
+                layer.Size = 0.045;
+                layer.Bold = false;
+                layer.Animation = LayerAnimation.None;
+                break;
+            default:
+                layer.Text = "Title";
+                layer.Size = 0.12;
+                break;
+        }
+        _project.Layers.Add(layer);
+        Selected = layer;
+        Commit("add");
+    }
+
+    private void AddSticker(string path)
+    {
+        double start = LayerStart();
+        var layer = new OverlayLayer
+        {
+            Kind = LayerKind.Sticker, ImagePath = path, Text = Path.GetFileNameWithoutExtension(path),
+            Start = start, End = Math.Min(start + 2.5, Math.Max(start + 0.5, _project.Duration)),
+            X = 0.5, Y = 0.4, Size = 0.32, Animation = LayerAnimation.Pop,
+        };
+        _project.Layers.Add(layer);
+        Selected = layer;
+        Commit("add");
+    }
+
+    private void ImportSticker()
+    {
+        var dialog = new OpenFileDialog { Title = "Choose an image", Filter = "Images|*.png;*.jpg;*.jpeg;*.gif;*.bmp|All files|*.*" };
+        if (dialog.ShowDialog() != true) return;
+        Stickers.Add(dialog.FileName);
+        AddSticker(dialog.FileName);
+    }
+
+    private void ImportAudio()
+    {
+        var dialog = new OpenFileDialog { Title = "Add music or a sound", Filter = "Audio|*.mp3;*.wav;*.m4a;*.aac;*.ogg;*.flac;*.mp4|All files|*.*" };
+        if (dialog.ShowDialog() != true) return;
+        double duration;
+        try { duration = MediaInfo.Probe(dialog.FileName).Duration; }
+        catch (Exception ex)
+        {
+            _main.ShowNotice("Can't open that file: " + ex.Message);
+            return;
+        }
+        var clip = new AudioClip
+        {
+            SourcePath = dialog.FileName, Title = Path.GetFileNameWithoutExtension(dialog.FileName), SourceDuration = duration,
+            Start = _playhead, In = 0, Out = duration, Volume = 0.6, FadeOut = 1,
+        };
+        _project.Audio.Add(clip);
+        Selected = clip;
+        Commit("add");
+    }
+
+    // Voiceover
+
+    public bool IsRecording => _voiceWriter != null;
+    public string MicName => AudioDevices.MicrophoneName(_controller.Settings.MicrophoneId);
+
+    /// <summary>Raised to start or stop preview playback around a voiceover.</summary>
+    public event Action<bool>? RecordingChanged;
+
+    private void ToggleVoiceover()
+    {
+        if (_voiceWriter == null) StartVoiceover();
+        else StopVoiceover();
+    }
+
+    private void StartVoiceover()
+    {
+        _voicePath = Path.Combine(ProjectStore.MediaDirectory(_project.Id), $"voice_{DateTime.Now:yyyyMMdd_HHmmss}.wav");
+        _voiceWriter = new WaveFileWriter(_voicePath, WaveFormat.CreateIeeeFloatWaveFormat(AudioFile.Rate, 2));
+        _voiceStart = _playhead;
+        _controller.Mic.Subscribe(_voiceSink);
+        Notify(nameof(IsRecording));
+        RecordingChanged?.Invoke(true);
+    }
+
+    private void StopVoiceover()
+    {
+        _controller.Mic.Unsubscribe(_voiceSink);
+        WaveFileWriter? writer = _voiceWriter;
+        _voiceWriter = null;
+        double seconds = writer?.TotalTime.TotalSeconds ?? 0;
+        writer?.Dispose();
+        Notify(nameof(IsRecording));
+        RecordingChanged?.Invoke(false);
+        if (_voicePath == null || seconds < 0.3)
+        {
+            _main.ShowNotice("No voiceover was recorded. Check your microphone in Settings.");
+            return;
+        }
+        var clip = new AudioClip
+        {
+            SourcePath = _voicePath, Title = "Voiceover", SourceDuration = seconds, Start = _voiceStart,
+            In = 0, Out = seconds, IsVoiceover = true,
+        };
+        _project.Audio.Add(clip);
+        Selected = clip;
+        Commit("add");
+    }
+
+    private unsafe void OnVoiceSamples(float* stereo, int frames, long timeUs)
+    {
+        WaveFileWriter? writer = _voiceWriter;
+        if (writer == null) return;
+        var buffer = new float[frames * 2];
+        new ReadOnlySpan<float>(stereo, frames * 2).CopyTo(buffer);
+        lock (buffer)
+        {
+            try { writer.WriteSamples(buffer, 0, buffer.Length); }
+            catch (ObjectDisposedException) { /* Stopped mid-packet. */ }
         }
     }
 
-    public Choice<CaptionPlacement>? SelectedPlacement
+    // Editing
+
+    private void Split()
     {
-        get => _selected == null ? null : PlacementChoices.FirstOrDefault(c => c.Value == _selected.Placement);
-        set
+        double at = _playhead;
+        switch (_selected)
         {
-            if (_selected == null || value == null) return;
-            _selected.Placement = value.Value;
-            Notify();
+            case OverlayLayer layer when at > layer.Start + 0.1 && at < layer.End - 0.1:
+            {
+                OverlayLayer copy = CloneLayer(layer);
+                copy.Start = at;
+                layer.End = at;
+                _project.Layers.Add(copy);
+                Selected = copy;
+                break;
+            }
+            case AudioClip audio when at > audio.Start + 0.1 && at < audio.End - 0.1:
+            {
+                AudioClip copy = CloneAudio(audio);
+                double cut = audio.In + (at - audio.Start);
+                copy.Start = at;
+                copy.In = cut;
+                copy.FadeIn = 0;
+                audio.Out = cut;
+                audio.FadeOut = 0;
+                _project.Audio.Add(copy);
+                Selected = copy;
+                break;
+            }
+            default:
+            {
+                (VideoClip? clip, double start) = _project.ClipAt(at);
+                if (clip == null) return;
+                double cut = clip.In + (at - start) * clip.Speed;
+                if (cut <= clip.In + 0.1 || cut >= clip.Out - 0.1) return;
+                VideoClip copy = CloneVideo(clip);
+                copy.In = cut;
+                copy.Transition = TransitionKind.None;
+                clip.Out = cut;
+                _project.Video.Insert(_project.Video.IndexOf(clip) + 1, copy);
+                Selected = copy;
+                break;
+            }
         }
+        Commit("split");
     }
 
-    public Choice<ExportAspect> Aspect
+    private void Delete()
     {
-        get => _aspect;
-        set
+        switch (_selected)
         {
-            if (Set(ref _aspect, value)) AspectChanged?.Invoke();
+            case VideoClip clip: _project.Video.Remove(clip); break;
+            case OverlayLayer layer: _project.Layers.Remove(layer); break;
+            case AudioClip audio: _project.Audio.Remove(audio); break;
+            default: return;
         }
+        Selected = null;
+        Commit("delete");
     }
 
-    public event Action? AspectChanged;
-
-    public string? MusicPath
+    private void Duplicate()
     {
-        get => _musicPath;
-        private set
+        switch (_selected)
         {
-            if (!Set(ref _musicPath, value)) return;
-            Notify(nameof(MusicName));
-            Notify(nameof(HasMusic));
+            case VideoClip clip:
+            {
+                VideoClip copy = CloneVideo(clip);
+                _project.Video.Insert(_project.Video.IndexOf(clip) + 1, copy);
+                Selected = copy;
+                break;
+            }
+            case OverlayLayer layer:
+            {
+                OverlayLayer copy = CloneLayer(layer);
+                copy.Start = layer.End;
+                copy.End = layer.End + layer.Duration;
+                _project.Layers.Add(copy);
+                Selected = copy;
+                break;
+            }
+            case AudioClip audio:
+            {
+                AudioClip copy = CloneAudio(audio);
+                copy.Start = audio.End;
+                _project.Audio.Add(copy);
+                Selected = copy;
+                break;
+            }
+            default: return;
         }
+        Commit("duplicate");
     }
 
-    public string MusicName => _musicPath == null ? "No music" : Path.GetFileName(_musicPath);
-    public bool HasMusic => _musicPath != null;
-    public double MusicVolume { get => _musicVolume; set => Set(ref _musicVolume, value); }
+    private static VideoClip CloneVideo(VideoClip clip) =>
+        System.Text.Json.JsonSerializer.Deserialize<VideoClip>(System.Text.Json.JsonSerializer.Serialize(clip))! is { } copy ? WithNewId(copy) : clip;
+
+    private static OverlayLayer CloneLayer(OverlayLayer layer) =>
+        System.Text.Json.JsonSerializer.Deserialize<OverlayLayer>(System.Text.Json.JsonSerializer.Serialize(layer))! is { } copy ? WithNewId(copy) : layer;
+
+    private static AudioClip CloneAudio(AudioClip audio) =>
+        System.Text.Json.JsonSerializer.Deserialize<AudioClip>(System.Text.Json.JsonSerializer.Serialize(audio))! is { } copy ? WithNewId(copy) : audio;
+
+    private static VideoClip WithNewId(VideoClip clip) { clip.Id = Guid.NewGuid().ToString("N"); return clip; }
+    private static OverlayLayer WithNewId(OverlayLayer layer) { layer.Id = Guid.NewGuid().ToString("N"); return layer; }
+    private static AudioClip WithNewId(AudioClip clip) { clip.Id = Guid.NewGuid().ToString("N"); return clip; }
+
+    /// <summary>Moves a video piece to a new position on the main track.</summary>
+    public void MoveVideo(VideoClip clip, int index)
+    {
+        int from = _project.Video.IndexOf(clip);
+        if (from < 0) return;
+        _project.Video.RemoveAt(from);
+        if (index > from) index--;
+        _project.Video.Insert(Math.Clamp(index, 0, _project.Video.Count), clip);
+        Commit("move");
+    }
+
+    // Export
 
     public bool IsExporting { get => _isExporting; private set => Set(ref _isExporting, value); }
     public double Progress { get => _progress; private set => Set(ref _progress, value); }
     public string Status { get => _status; private set => Set(ref _status, value); }
     public bool HasResult => _resultPath != null && !_isExporting;
 
-    public void AddClip(ClipInfo clip)
-    {
-        var segment = new EditSegment { SourcePath = clip.Path, In = 0, Out = Math.Max(0.5, clip.DurationSeconds) };
-        var item = new SegmentItem(segment, clip.Title, clip.DurationSeconds);
-        Segments.Add(item);
-        Selected = item;
-        SegmentsChanged();
-    }
-
-    private void SegmentsChanged()
-    {
-        Notify(nameof(HasSegments));
-        Notify(nameof(TotalText));
-    }
-
-    private void ReloadLibrary()
-    {
-        LibraryClips.Clear();
-        foreach (ClipInfo clip in _controller.Library.Clips)
-            LibraryClips.Add(new Choice<ClipInfo>($"{clip.Title}  ({ClipItem.FormatTime(clip.DurationSeconds)})", clip));
-        ClipToAdd ??= LibraryClips.FirstOrDefault();
-    }
-
-    private void Split()
-    {
-        SegmentItem? item = _selected;
-        if (item == null) return;
-        double at = Playhead;
-        if (at <= item.In + 0.25 || at >= item.Out - 0.25)
-        {
-            _main.ShowNotice("Move the preview into the middle of the piece, then split.");
-            return;
-        }
-        SegmentItem right = item.Clone();
-        right.SetRange(at, item.Out);
-        item.SetRange(item.In, at);
-        Segments.Insert(Segments.IndexOf(item) + 1, right);
-        Selected = right;
-        SegmentsChanged();
-    }
-
-    private void Delete()
-    {
-        SegmentItem? item = _selected;
-        if (item == null) return;
-        int index = Segments.IndexOf(item);
-        Segments.Remove(item);
-        Selected = Segments.Count == 0 ? null : Segments[Math.Min(index, Segments.Count - 1)];
-        SegmentsChanged();
-    }
-
-    private void Duplicate()
-    {
-        SegmentItem? item = _selected;
-        if (item == null) return;
-        SegmentItem copy = item.Clone();
-        Segments.Insert(Segments.IndexOf(item) + 1, copy);
-        Selected = copy;
-        SegmentsChanged();
-    }
-
-    private void Move(int direction)
-    {
-        SegmentItem? item = _selected;
-        if (item == null) return;
-        int index = Segments.IndexOf(item);
-        int target = index + direction;
-        if (target < 0 || target >= Segments.Count) return;
-        Segments.Move(index, target);
-    }
-
-    private void ChooseMusic()
-    {
-        var dialog = new OpenFileDialog
-        {
-            Title = "Choose background music",
-            Filter = "Audio|*.mp3;*.wav;*.m4a;*.aac;*.ogg;*.flac;*.mp4|All files|*.*",
-        };
-        if (dialog.ShowDialog() == true) MusicPath = dialog.FileName;
-    }
-
     private async void Export()
     {
-        if (_isExporting || Segments.Count == 0) return;
-        var project = new EditProject
-        {
-            Aspect = _aspect.Value,
-            MusicPath = _musicPath,
-            MusicVolume = (float)_musicVolume,
-        };
-        foreach (SegmentItem item in Segments) project.Segments.Add(item.Segment.Clone());
-
+        if (_isExporting || _project.Video.Count == 0) return;
+        EditorProject snapshot = _project.Clone();
         string directory = _controller.Settings.ClipDirectory;
-        string baseName = RecordingEngine.Sanitize(Segments[0].Title) + "_edit";
+        string baseName = RecordingEngine.Sanitize(_project.Name);
         _cancel = new CancellationTokenSource();
         CancellationToken token = _cancel.Token;
         var progress = new Progress<double>(value =>
@@ -380,10 +709,10 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
         _resultPath = null;
         Notify(nameof(HasResult));
         Progress = 0;
-        Status = "Starting export";
+        Status = "Preparing audio";
         try
         {
-            _resultPath = await Task.Run(() => Exporter.Export(project, directory, baseName, progress, token), token);
+            _resultPath = await Task.Run(() => Exporter.Export(snapshot, directory, baseName, progress, token), token);
             await Task.Run(_controller.Library.Refresh);
             Status = $"Saved {Path.GetFileNameWithoutExtension(_resultPath)}";
         }
@@ -407,6 +736,9 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         _cancel?.Cancel();
+        if (_voiceWriter != null) StopVoiceover();
+        _saveTimer.Stop();
+        ProjectStore.Save(_project);
         _controller.Library.Changed -= _libraryChanged;
     }
 }

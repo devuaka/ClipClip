@@ -510,16 +510,39 @@ internal static class Tests
             Thread.Sleep(8000);
             source = engine.SaveClip(directory, "Studio", ClipTrigger.Automation)!.GetAwaiter().GetResult().Path!;
         }
-        var project = new ClipClip.Engine.Editing.EditProject { Aspect = ClipClip.Engine.Editing.ExportAspect.Vertical, MusicPath = source, MusicVolume = 0.3f };
-        project.Segments.Add(new() { SourcePath = source, In = 0.5, Out = 2.5, Caption = "Test caption", Placement = ClipClip.Engine.Editing.CaptionPlacement.Top });
-        project.Segments.Add(new() { SourcePath = source, In = 3, Out = 5, Speed = 2, Volume = 0.5f });
-        project.Segments.Add(new() { SourcePath = source, In = 1, Out = 2, Speed = 0.5, Muted = true });
+        double length = ClipProbe.Read(source, false).DurationSeconds;
+        var project = new ClipClip.Engine.Editing.EditorProject { Aspect = ClipClip.Engine.Editing.ExportAspect.Vertical, Fps = 30 };
+        project.Video.Add(new() { SourcePath = source, Title = "A", SourceDuration = length, In = 0.5, Out = 2.5, Transition = ClipClip.Engine.Editing.TransitionKind.Fade, Filter = ClipClip.Engine.Editing.FilterPreset.Vivid });
+        project.Video.Add(new() { SourcePath = source, Title = "B", SourceDuration = length, In = 3, Out = 5, Speed = 2, Motion = ClipClip.Engine.Editing.MotionEffect.Shake, Transition = ClipClip.Engine.Editing.TransitionKind.Flash });
+        project.Video.Add(new() { SourcePath = source, Title = "C", SourceDuration = length, In = 1, Out = 2, Speed = 0.5, KeepPitch = true, Motion = ClipClip.Engine.Editing.MotionEffect.SlowZoom, Filter = ClipClip.Engine.Editing.FilterPreset.Mono });
+        project.Layers.Add(new() { Kind = ClipClip.Engine.Editing.LayerKind.Text, Text = "NO WAY", Start = 0.2, End = 3, Y = 0.2, Size = 0.1, Color = "#FFE14D" });
+        project.Layers.Add(new() { Kind = ClipClip.Engine.Editing.LayerKind.Sticker, ImagePath = ClipClip.Engine.Editing.StickerLibrary.EnsureBuiltIns()[0], Start = 1, End = 4, X = 0.5, Y = 0.6, Size = 0.4 });
+        project.Audio.Add(new() { SourcePath = source, Title = "Music", SourceDuration = length, Start = 0.5, In = 0, Out = 3, Volume = 0.4, FadeIn = 0.5, FadeOut = 1 });
         var watch = Stopwatch.StartNew();
         string output = ClipClip.Engine.Editing.Exporter.Export(project, directory, "studio_out", null, CancellationToken.None);
         ClipProbe probe = ClipProbe.Read(output, true);
-        Console.WriteLine($"export {watch.Elapsed.TotalSeconds:F1}s -> {probe.Width}x{probe.Height} {probe.DurationSeconds:F2}s audio={probe.HasAudio} decodable={probe.HasDecodableVideo}");
-        Thumbnailer.Create(output, Path.Combine(Path.GetTempPath(), "clipclip_studio_thumb.jpg"), 0.5);
-        bool ok = probe.Width == 1080 && probe.Height == 1920 && probe.HasAudio && probe.HasDecodableVideo && probe.DurationSeconds is > 4.5 and < 5.6;
+        Console.WriteLine($"export {watch.Elapsed.TotalSeconds:F1}s -> {probe.Width}x{probe.Height} {probe.DurationSeconds:F2}s (project {project.Duration:F2}s) audio={probe.HasAudio}");
+        unsafe
+        {
+            using var compositor = new ClipClip.Engine.Editing.Compositor(540, 960, true);
+            foreach (double at in new[] { 1.6, 2.6, 4.5 })
+            {
+                compositor.Render(project, at);
+                using var bitmap = new System.Drawing.Bitmap(540, 960, compositor.Stride, System.Drawing.Imaging.PixelFormat.Format32bppRgb, (nint)compositor.Canvas);
+                bitmap.Save(Path.Combine(Path.GetTempPath(), $"clipclip_frame_{at:F1}.png"), System.Drawing.Imaging.ImageFormat.Png);
+            }
+        }
+
+        float[] tone = new float[48000 * 2];
+        for (int i = 0; i < 48000; i++) tone[i * 2] = tone[i * 2 + 1] = (float)Math.Sin(2 * Math.PI * 440 * i / 48000);
+        float[] slow = ClipClip.Engine.Editing.Exporter.TimeStretch(tone, 0.5);
+        int crossings = 0;
+        for (int i = 48000; i < 72000; i++) if (slow[i * 2] < 0 && slow[(i + 1) * 2] >= 0) crossings++;
+        double pitch = crossings / 0.5;
+        Console.WriteLine($"time stretch: {tone.Length / 2} -> {slow.Length / 2} frames, pitch {pitch:F0} Hz (source 440)");
+
+        bool ok = probe.Width == 1080 && probe.Height == 1920 && probe.HasAudio && probe.HasDecodableVideo &&
+                  Math.Abs(probe.DurationSeconds - project.Duration) < 0.3 && slow.Length / 2 == 96000 && Math.Abs(pitch - 440) < 25;
         Console.WriteLine(ok ? "PASS" : "FAIL");
         return ok ? 0 : 1;
     }
